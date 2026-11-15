@@ -1,0 +1,985 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Home Network Map</title>
+<style>
+/* Homelab Hub "Signal" tokens, copied from docs/mockups. Light is the base; dark overrides below (system, then explicit). */
+:root {
+  --bg: #e7e1d5; --surface: #f2eee5; --surface2: #e0d9cb; --ink: #191c1b; --muted: #5a605d; --line: #c2baa9;
+  --accent: #067f72; --accent-ink: #f4f1ea; --accent-soft: #d3e4dc;
+  --ok: #2f7a36; --warn: #9a6408; --bad: #a8322a; --info: #23688f;
+  --ok-soft: #dbe8d3; --warn-soft: #f0e2c2; --bad-soft: #f0d6cf; --info-soft: #d5e2e6;
+  --code-bg: #0a181c; --code-ink: #dfe7e4;
+  --shadow: none;
+  --radius: 0px; --radius-lg: 0px;
+  --f-display: "Cormorant Garamond", "Palatino Linotype", Palatino, "Book Antiqua", "P052", Georgia, serif;
+  --f-body: "Barlow", "DIN Alternate", Bahnschrift, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: light; --ember: #b4531a; --gold: #8a6a2a;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #061215; --surface: #0a181c; --surface2: #10262b; --ink: #dfe7e4; --muted: #8b9b98; --line: #1c383e;
+    --accent: #40c1ac; --accent-ink: #03110f; --accent-soft: #0d2c2b; --ok: #9ad17a; --warn: #e5b04a; --bad: #e0564a; --info: #6ab8e6;
+    --ok-soft: #17291a; --warn-soft: #2e2613; --bad-soft: #321715; --info-soft: #12283a; --code-bg: #020607; --code-ink: #dfe7e4;
+    --shadow: none; color-scheme: dark; --ember: #e0752a; --gold: #c9a45c;
+}
+}
+:root[data-theme="dark"] {
+  --bg: #061215; --surface: #0a181c; --surface2: #10262b; --ink: #dfe7e4; --muted: #8b9b98; --line: #1c383e;
+  --accent: #40c1ac; --accent-ink: #03110f; --accent-soft: #0d2c2b; --ok: #9ad17a; --warn: #e5b04a; --bad: #e0564a; --info: #6ab8e6;
+  --ok-soft: #17291a; --warn-soft: #2e2613; --bad-soft: #321715; --info-soft: #12283a; --code-bg: #020607; --code-ink: #dfe7e4;
+  --shadow: none; color-scheme: dark; --ember: #e0752a; --gold: #c9a45c;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 var(--f-body); }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+a { color: var(--accent); }
+h1, h2, h3 { font-family: var(--f-display); line-height: 1.2; margin: 0; }
+.mono { font-family: var(--f-mono); }
+.muted { color: var(--muted); }
+.grow { flex: 1; }
+.eyebrow { font: 500 11px var(--f-mono); text-transform: uppercase; letter-spacing: .09em; color: var(--muted); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* ---- top bar + tabs ---- */
+.bar { position: sticky; top: 0; z-index: 20; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 10px 16px; background: var(--bg); border-bottom: 1px solid var(--line); }
+.brand { font: 700 15px var(--f-display); display: flex; gap: 8px; align-items: center; margin-right: 10px; }
+.brand i { width: 12px; height: 12px; background: var(--accent); display: inline-block; border-radius: var(--radius); }
+.nav { display: flex; gap: 2px; flex-wrap: wrap; }
+.nav button { background: none; border: 0; padding: 6px 12px; color: var(--muted); border-radius: var(--radius); font-weight: 500; }
+.nav button[aria-selected="true"] { color: var(--ink); background: var(--surface2); }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 18px 16px 48px; }
+.head { margin: 0 0 16px; }
+.head h1 { font-size: clamp(1.4rem, 3vw, 1.9rem); font-weight: 700; }
+.sub { color: var(--muted); margin: 6px 0 0; max-width: 70ch; }
+.view[hidden] { display: none; }
+
+/* ---- controls ---- */
+.btn { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 6px 12px; font-size: 14px; font-weight: 500; white-space: nowrap; }
+.btn:hover { border-color: var(--ink); }
+.btn.pri { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+.btn.sm { padding: 3px 9px; font-size: 13px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; flex-wrap: wrap; }
+.seg button { border: 0; background: var(--surface); padding: 6px 12px; font-size: 13px; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.search { padding: 7px 10px; border: 1px solid var(--line); background: var(--surface); border-radius: var(--radius); min-width: min(100%, 220px); }
+.pill { font: 500 10.5px var(--f-mono); text-transform: uppercase; letter-spacing: .06em; padding: 1px 6px; border-radius: 2px; background: var(--surface2); color: var(--muted); white-space: nowrap; display: inline-block; }
+.pill.ok { background: var(--ok-soft); color: var(--ok); } .pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.bad { background: var(--bad-soft); color: var(--bad); } .pill.info { background: var(--info-soft); color: var(--info); }
+.pill.acc { background: var(--accent-soft); color: var(--accent); }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 0 0 14px; }
+.banner { border: 1px solid var(--line); border-left: 4px solid var(--info); background: var(--surface); padding: 8px 12px; border-radius: var(--radius); font-size: 14px; margin: 0 0 14px; }
+.banner.warn { border-left-color: var(--warn); } .banner.ok { border-left-color: var(--ok); } .banner.bad { border-left-color: var(--bad); }
+.callout { border-left: 4px solid var(--info); background: var(--info-soft); padding: 10px 14px; border-radius: var(--radius); margin: 12px 0; font-size: 14.5px; }
+.callout.warn { border-color: var(--warn); background: var(--warn-soft); } .callout.tip { border-color: var(--ok); background: var(--ok-soft); } .callout.danger { border-color: var(--bad); background: var(--bad-soft); }
+
+/* ---- panes, tiles, tables, code ---- */
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; align-items: start; }
+.pane { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 16px; box-shadow: var(--shadow); min-width: 0; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 0 0 16px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; }
+.tile .k { font: 500 11px var(--f-mono); text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+.tile .v { font: 600 1.3rem var(--f-display); font-variant-numeric: tabular-nums; margin-top: 2px; }
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+th { background: var(--surface2); font-weight: 600; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+code { font-family: var(--f-mono); font-size: 13px; background: var(--surface2); padding: 1px 5px; border-radius: 3px; }
+.codeblock { background: var(--code-bg); color: var(--code-ink); border-radius: var(--radius-lg); margin: 10px 0; overflow: hidden; }
+.codeblock pre { margin: 0; padding: 12px; overflow-x: auto; font: 13px/1.5 var(--f-mono); }
+
+/* ---- diagram ---- */
+.stage { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-lg); overflow-x: auto; }
+.stage svg { display: block; width: 100%; height: auto; }
+.zone rect { fill: var(--surface); stroke: var(--line); stroke-width: 1.2; stroke-dasharray: 5 4; }
+.zone.t-accent rect { fill: var(--accent-soft); } .zone.t-info rect { fill: var(--info-soft); }
+.zone.t-ok rect { fill: var(--ok-soft); } .zone.t-warn rect { fill: var(--warn-soft); } .zone.t-bad rect { fill: var(--bad-soft); }
+.zone text { font: 500 11px var(--f-mono); letter-spacing: .08em; text-transform: uppercase; fill: var(--muted); }
+.node { cursor: pointer; transition: opacity .15s; }
+.node rect.box { fill: var(--surface); stroke: var(--line); stroke-width: 1.2; }
+.node:hover rect.box, .node:focus-visible rect.box { stroke: var(--accent); }
+.node.sel rect.box { stroke: var(--accent); stroke-width: 2.4; fill: var(--accent-soft); }
+.node rect.ico { fill: var(--accent-soft); } .node.sel rect.ico { fill: var(--surface); }
+.node text.i { font: 700 11px var(--f-mono); fill: var(--accent); text-anchor: middle; }
+.node text.n { font: 600 13px var(--f-body); fill: var(--ink); }
+.node text.s { font: 400 10.5px var(--f-mono); fill: var(--muted); }
+.edge path { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-linejoin: round; }
+.edge.dashed path { stroke-dasharray: 6 4; }
+.edge text { font: 500 10.5px var(--f-mono); fill: var(--muted); text-anchor: middle; paint-order: stroke; stroke: var(--bg); stroke-width: 5px; stroke-linejoin: round; }
+.edge.hi path { stroke: var(--accent); stroke-width: 2.4; }
+.edge.hi text { fill: var(--accent); }
+svg.focus .node:not(.rel), svg.focus .edge:not(.hi) { opacity: .28; }
+.edge.step path { stroke: var(--accent); stroke-width: 3; stroke-dasharray: 8 6; animation: flow .7s linear infinite; }
+@keyframes flow { to { stroke-dashoffset: -14; } }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); margin-top: 10px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 22px; height: 0; border-top: 2px solid var(--muted); display: inline-block; }
+.legend i.d { border-top-style: dashed; }
+.detail h2 { font-size: 1.15rem; margin: 6px 0 4px; }
+.detail dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 10px 0; font-size: 13.5px; }
+.detail dt { font: 500 11px var(--f-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding-top: 2px; }
+.detail dd { margin: 0; }
+.links { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 6px; }
+.links button { width: 100%; text-align: left; background: var(--surface2); border: 1px solid transparent; border-radius: var(--radius); padding: 6px 10px; font-size: 13.5px; }
+.links button:hover { border-color: var(--accent); }
+.links .lbl { font: 400 11px var(--f-mono); color: var(--muted); display: block; }
+.stepcap { font-size: 14px; min-height: 2.9em; margin: 8px 0 0; }
+
+@media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); } .stage svg { min-width: var(--minw, 760px); } }
+@media (prefers-reduced-motion: reduce) { .edge.step path { animation: none; } .node { transition: none; } }
+
+/* ---- guide content ---- */
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin: 0 0 16px; }
+.cols.three { grid-template-columns: repeat(3, minmax(0, 1fr)); } @media (max-width: 900px) { .cols.three { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); } }
+.cols .pane h3 { margin: 0 0 6px; font-size: 1.02rem; }
+.cols .pane p, .pane p { margin: 6px 0; }
+.pane ul { margin: 6px 0; padding-left: 20px; } .pane li { margin: 3px 0; }
+.section-h { font: 600 1.2rem var(--f-display); margin: 26px 0 10px; }
+.lead { font-size: 1.05rem; max-width: 74ch; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: 14px; margin: 8px 0; }
+.kv dt { font: 500 11px var(--f-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding-top: 3px; } .kv dd { margin: 0; }
+.steps { counter-reset: s; list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 8px; }
+.steps li { counter-increment: s; display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: start; }
+.steps li::before { content: counter(s); width: 24px; height: 24px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); font: 700 12px var(--f-mono); display: grid; place-items: center; }
+.tag { display: inline-block; font: 500 11px var(--f-mono); background: var(--surface2); border-radius: 3px; padding: 1px 6px; margin: 0 4px 4px 0; }
+.repo { display: none; } .repo.on { display: inline-flex; }
+@media (max-width: 600px) { .kv { grid-template-columns: 1fr; } }
+/* ==== Valhalla skin ==== */
+body { background-image: radial-gradient(90% 420px at 50% 0, color-mix(in srgb, var(--accent) 15%, transparent), transparent 72%); background-repeat: no-repeat; }
+h1, h2, h3 { font-weight: 600; letter-spacing: .04em; font-variant-numeric: lining-nums; }
+.head h1 { font-weight: 500; font-size: clamp(1.6rem, 3.4vw, 2.5rem); text-transform: uppercase; letter-spacing: .12em; color: var(--accent); }
+.eyebrow, .tile .k, .pill, th { font-family: var(--f-body); letter-spacing: .16em; }
+.bar { background: color-mix(in srgb, var(--bg) 94%, transparent); }
+.brand { font: 600 16px var(--f-display); letter-spacing: .16em; text-transform: uppercase; }
+.brand i { width: 20px; height: 22px; border-radius: 0; background: var(--accent); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 108'%3E%3Cpath d='M 44.5 20 L 55.5 20 L 56.5 74 L 50 92 L 43.5 74 Z M 50 4 L 43 12 C 33 13 21 10 9 3 C 3 16 6 31 17 42 C 23 30 33 23 44.5 22 L 50 22 Z M 50 4 L 57 12 C 67 13 79 10 91 3 C 97 16 94 31 83 42 C 77 30 67 23 55.5 22 L 50 22 Z M 22 92 C 33 100 44 101.5 50 97.5 C 56 101.5 67 100 78 92 C 68 105 57 106 50 102 C 43 106 32 105 22 92 Z'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 108'%3E%3Cpath d='M 44.5 20 L 55.5 20 L 56.5 74 L 50 92 L 43.5 74 Z M 50 4 L 43 12 C 33 13 21 10 9 3 C 3 16 6 31 17 42 C 23 30 33 23 44.5 22 L 50 22 Z M 50 4 L 57 12 C 67 13 79 10 91 3 C 97 16 94 31 83 42 C 77 30 67 23 55.5 22 L 50 22 Z M 22 92 C 33 100 44 101.5 50 97.5 C 56 101.5 67 100 78 92 C 68 105 57 106 50 102 C 43 106 32 105 22 92 Z'/%3E%3C/svg%3E") center / contain no-repeat; }
+.nav button { text-transform: uppercase; letter-spacing: .16em; font-size: 12px; border-radius: 0; }
+.nav button[aria-selected="true"] { background: none; color: var(--ink); box-shadow: inset 0 -2px 0 var(--accent); }
+.btn { text-transform: uppercase; letter-spacing: .12em; font-size: 12px; }
+.btn.sm { font-size: 11px; }
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn.pri:hover { color: var(--accent-ink); }
+.seg button { text-transform: uppercase; letter-spacing: .1em; font-size: 11.5px; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.pane { box-shadow: none; background: linear-gradient(180deg, color-mix(in srgb, var(--surface2) 70%, var(--surface)), var(--surface)); border-image: linear-gradient(135deg, var(--accent), var(--line) 14px, var(--line) calc(100% - 14px), var(--accent)) 1; }
+.tile { background: linear-gradient(180deg, color-mix(in srgb, var(--surface2) 70%, var(--surface)), var(--surface)); }
+.tile .v { font-size: 1.55rem; font-variant-numeric: lining-nums tabular-nums; }
+th { background: transparent; font-weight: 500; font-size: 11px; text-transform: uppercase; color: var(--muted); }
+.stage { background: color-mix(in srgb, var(--surface) 55%, var(--bg)); }
+.zone rect, .node rect.box, .node rect.ico { rx: 0; ry: 0; }
+.zone text { font-family: var(--f-body); letter-spacing: .18em; }
+.node text.i { font-family: var(--f-display); font-size: 13px; }
+.node.sel rect.box { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 60%, transparent)); }
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <span class="brand"><i></i><span id="brand">Example system</span></span>
+  <nav class="nav" id="nav" role="tablist" aria-label="Views"></nav>
+  <span class="grow"></span>
+  <button class="btn sm" id="themeBtn" title="Switch theme">Theme: system</button>
+</header>
+
+<main class="wrap">
+  <div class="head">
+    <div class="eyebrow" id="eyebrow">Guide</div>
+    <h1 id="title">x</h1>
+    <p class="sub" id="subtitle"></p>
+  </div>
+
+  <section class="view" id="v-overview">
+<p class="lead">A two-line, two-VLAN home network: a <b>fast lane</b> for servers and workstations, a <b>slow lane</b> for cameras and IoT, and a router that moves each lane to the other line if its own line fails. Private remote access is Tailscale; the few public pages leave through outbound tunnels, so no router port is forwarded.</p><div class="tiles"><div class="tile"><div class="k">Internet lines</div><div class="v">2</div></div><div class="tile"><div class="k">VLANs</div><div class="v">2</div></div><div class="tile"><div class="k">Switches</div><div class="v">3</div></div><div class="tile"><div class="k">Access points</div><div class="v">3</div></div><div class="tile"><div class="k">Port forwarding</div><div class="v">none by design</div></div></div><div class="cols three"><div class="pane"><h3>VLAN 10: high speed <span class="pill ok">1 Gbps</span></h3><p>192.168.10.0/24 behind the managed switch. Servers, workstations and the main WiFi 6 access points. Prefers the 1 Gbps fiber.</p></div><div class="pane"><h3>VLAN 20: IoT and cameras <span class="pill warn">30 Mbps</span></h3><p>192.168.20.0/24 behind a 100 Mbps unmanaged switch. Camera recorder and the floor-2 access point. Prefers the 30 Mbps line.</p></div><div class="pane"><h3>Failover both ways</h3><p>If the fiber dies, the fast VLAN uses the slow line. If the slow line dies, the cameras use the fiber. The router does this on its own, with no manual change.</p></div></div><div class="callout tip"><b>How to read this page.</b> <em>Topology</em> is clickable and has three walk-throughs: a normal day, a fiber failure, and waking the server. <em>How you reach things</em> filters the access paths by network.</div>
+  </section>
+
+  <section class="view" id="v-diagram" hidden>
+    <div class="toolbar">
+      <div class="seg" id="layers" role="group" aria-label="Layers"></div>
+      <input class="search" id="q" type="search" placeholder="Find a component…" aria-label="Find a component">
+      <span class="grow"></span>
+      <label class="muted" for="flowSel" style="font-size:13px">Walk through</label>
+      <select class="search" id="flowSel" style="min-width:0"></select>
+      <button class="btn sm" id="prev" aria-label="Previous step">◀</button>
+      <button class="btn sm pri" id="play">▶ Play</button>
+      <button class="btn sm" id="next" aria-label="Next step">▶|</button>
+    </div>
+    <div class="layout">
+      <div>
+        <div class="stage"><svg id="svg" role="img" aria-label="Home Network Map diagram"></svg></div>
+        <p class="stepcap" id="stepcap" aria-live="polite"></p>
+        <div class="legend">
+          <span><i></i> request / data</span><span><i class="d"></i> async / optional</span>
+          <span>Click a box for details · hover to trace its connections · Esc clears</span>
+        </div>
+      </div>
+      <aside class="pane detail" id="detail" aria-live="polite"></aside>
+    </div>
+    <div class="callout">Addresses shown are subnets only. Click any box to see its switch port and role; toggle <em>Tunnels and VPN</em> to hide the remote-access overlays.</div>
+  </section>
+
+  <section class="view" id="v-vlans" hidden>
+<div class="cols"><div class="pane"><h3>Core switch ports (managed, 8 x 1 Gbps)</h3><div class="tablewrap"><table><thead><tr><th>Port</th><th>Connected to</th></tr></thead><tbody><tr><td>1</td><td>router uplink (VLAN 10)</td></tr><tr><td>2</td><td>room switch</td></tr><tr><td>3</td><td>Raspberry Pi</td></tr><tr><td>4</td><td>Proxmox host</td></tr><tr><td>5</td><td>family PC</td></tr><tr><td>6</td><td>WiFi 6 access point</td></tr></tbody></table></div></div><div class="pane"><h3>Room and IoT switches (unmanaged)</h3><div class="tablewrap"><table><thead><tr><th>Switch</th><th>Port</th><th>Connected to</th></tr></thead><tbody><tr><td>Room (5 x 1 Gbps)</td><td>uplink</td><td>core switch port 2</td></tr><tr><td>Room</td><td>2</td><td>workstation</td></tr><tr><td>Room</td><td>3</td><td>WiFi 6 access point</td></tr><tr><td>Room</td><td>4</td><td>office laptop</td></tr><tr><td>IoT (8 x 100 Mbps)</td><td>uplink</td><td>router LAN 3</td></tr><tr><td>IoT</td><td>2</td><td>camera recorder</td></tr><tr><td>IoT</td><td>3</td><td>floor-2 access point</td></tr></tbody></table></div></div></div><h2 class="section-h">Router ports and addressing</h2><div class="tablewrap"><table><thead><tr><th>Router port</th><th>Role</th><th>Addressing</th></tr></thead><tbody><tr><td>WAN 1</td><td>ISP 1, fiber 1 Gbps</td><td>PPPoE</td></tr><tr><td>WAN 2</td><td>ISP 2 via the provider's router</td><td>dynamic IP</td></tr><tr><td>LAN 1 + 2</td><td>VLAN 10, fast</td><td>192.168.10.0/24, gateway .1</td></tr><tr><td>LAN 3</td><td>VLAN 20, IoT</td><td>192.168.20.0/24</td></tr></tbody></table></div><div class="callout">Servers use fixed addresses (set on the machine). The Raspberry Pi is the exception: it asks for an address by DHCP and the router always gives it the same one (a reservation), so a rebuilt Pi comes back at the right address.</div>
+  </section>
+
+  <section class="view" id="v-access" hidden>
+<div class="toolbar"><div class="seg" data-filter="nwtb" data-count="nwcount" role="group" aria-label="Filter"><button aria-pressed="true" data-f="all">All</button><button aria-pressed="false" data-f="inet">Internet</button><button aria-pressed="false" data-f="lan">Home network</button><button aria-pressed="false" data-f="ts">Tailscale</button></div><span class="muted" id="nwcount"></span></div><div class="tablewrap"><table><thead><tr><th>From</th><th>Address</th><th>Via</th><th>Lands on</th><th>What you get</th></tr></thead><tbody id="nwtb"><tr data-cat="inet"><td>Internet</td><td>the portfolio's own hostname</td><td>Cloudflare, outbound tunnel, private container network</td><td>portfolio server (no host port)</td><td>the public portfolio, read-only</td></tr><tr data-cat="inet"><td>Internet</td><td>a wildcard of published Docs pages</td><td>same tunnel</td><td>page server (no host port)</td><td>one published page per hostname, nothing else</td></tr><tr data-cat="lan"><td>Home network</td><td>dashboard on port 3010</td><td>direct</td><td>Hub dashboard on the Pi</td><td>dashboard, power buttons, budget, terminal (login)</td></tr><tr data-cat="lan"><td>Home network</td><td>container ports (Jellyfin, n8n, wiki...)</td><td>direct</td><td>services in the Proxmox containers</td><td>each service's own login</td></tr><tr data-cat="ts"><td>Tailscale</td><td>the Pi's tailnet name</td><td>tailscale serve, HTTPS</td><td>Hub dashboard</td><td>the same dashboard from anywhere</td></tr><tr data-cat="ts"><td>Tailscale</td><td>the Proxmox host's tailnet name</td><td>tailscale serve, HTTPS</td><td>Proxmox web UI</td><td>full host administration (login)</td></tr><tr data-cat="ts"><td>Tailscale</td><td>dev box and Docs editor tailnet names</td><td>tailscale in the container</td><td>code-server, Docs editor</td><td>browser IDE and the editor</td></tr></tbody></table></div><div class="callout tip"><b>No inbound ports by design.</b> Nothing needs to connect <em>in</em> from the internet: public pages travel on tunnels the servers open outward, and private access rides the encrypted Tailscale mesh.</div>
+  </section>
+
+  <section class="view" id="v-design" hidden>
+<div class="cols three"><div class="pane"><h3>Why two VLANs</h3><p>Cameras and IoT gear are chatty and rarely patched. On their own VLAN they cannot see the servers, and their slow link cannot slow the fast one.</p></div><div class="pane"><h3>Why two lines</h3><p>A 30 Mbps backup line costs little and turns a fiber outage from "no internet" into "slow internet", for servers and cameras alike.</p></div><div class="pane"><h3>Why a managed core switch</h3><p>One managed switch carries the VLAN 10 core. The rest of the house uses cheap unmanaged switches because they only need to pass traffic.</p></div></div><h2 class="section-h">Wake-on-LAN across the network</h2><ol class="steps"><li><div>The Proxmox host's network card stays powered in standby with Wake-on-LAN enabled (re-applied at every boot).</div></li><li><div>The always-on Pi sends a magic packet (the host's MAC repeated 16 times) as a broadcast on VLAN 10.</div></li><li><div>The switch floods it to every port on that VLAN; only the sleeping card recognises its own address and powers the machine on.</div></li><li><div>The Hub then waits for the host to answer and shows its status light turning green.</div></li></ol><div class="callout warn"><b>BIOS matters.</b> The motherboard setting for waking on PCI-E / LAN has to be enabled, or the packet arrives and nothing happens. Wake-on-LAN also only works inside one VLAN, which is one more reason the Pi and the server share VLAN 10.</div>
+  </section>
+
+  <section class="view" id="v-table" hidden>
+    <div class="toolbar"><span class="muted" id="count"></span></div>
+    <div class="tablewrap"><table id="tbl"></table></div>
+  </section>
+</main>
+
+
+<script>
+/* ============================ 1. EDIT THIS: the content ============================
+   Coordinates live on a virtual canvas (VIEW.w x VIEW.h); the SVG scales to the width available.
+   Nodes are NW x NH (156 x 54). Leave ~40px between nodes so edge labels fit. A node's `zone` is only a grouping label
+   for the table; zones are drawn from their own x/y/w/h. `layer` is optional: nodes/edges with a layer can be toggled. */
+const DATA = {
+ "brand": "Homelab",
+ "eyebrow": "Network reference",
+ "title": "Home Network Map",
+ "subtitle": "Two internet lines, two VLANs, three switches and an overlay of private and public tunnels, with failover in both directions.",
+ "view": {
+  "w": 1380,
+  "h": 760
+ },
+ "zones": [
+  {
+   "id": "isp",
+   "label": "Internet providers",
+   "x": 20,
+   "y": 40,
+   "w": 226,
+   "h": 250,
+   "tone": "warn"
+  },
+  {
+   "id": "core",
+   "label": "Core router",
+   "x": 290,
+   "y": 40,
+   "w": 230,
+   "h": 250,
+   "tone": ""
+  },
+  {
+   "id": "v10",
+   "label": "VLAN 10: high speed (192.168.10.0/24)",
+   "x": 560,
+   "y": 40,
+   "w": 800,
+   "h": 470,
+   "tone": "ok"
+  },
+  {
+   "id": "over",
+   "label": "Remote access overlays",
+   "x": 1090,
+   "y": 60,
+   "w": 250,
+   "h": 230,
+   "tone": "info"
+  },
+  {
+   "id": "v20",
+   "label": "VLAN 20: IoT and cameras (192.168.20.0/24)",
+   "x": 560,
+   "y": 540,
+   "w": 800,
+   "h": 200,
+   "tone": ""
+  }
+ ],
+ "layers": [
+  {
+   "id": "overlay",
+   "label": "Tunnels and VPN"
+  }
+ ],
+ "nodes": [
+  {
+   "id": "isp1",
+   "zone": "isp",
+   "ico": "I1",
+   "label": "ISP 1: fiber",
+   "sub": "1 Gbps, PPPoE",
+   "x": 36,
+   "y": 90,
+   "desc": "The primary line, a 1 Gbps fiber connection converted to Ethernet and connected to the router's WAN 1 port.",
+   "facts": [
+    [
+     "Speed",
+     "1 Gbps"
+    ],
+    [
+     "Router port",
+     "WAN 1, PPPoE"
+    ],
+    [
+     "Default for",
+     "VLAN 10"
+    ]
+   ]
+  },
+  {
+   "id": "isp2",
+   "zone": "isp",
+   "ico": "I2",
+   "label": "ISP 2: backup",
+   "sub": "30 Mbps backup",
+   "x": 36,
+   "y": 190,
+   "desc": "A second, slower line through the provider's own router, connected to WAN 2 with a dynamic address.",
+   "facts": [
+    [
+     "Speed",
+     "30 Mbps"
+    ],
+    [
+     "Router port",
+     "WAN 2, dynamic IP"
+    ],
+    [
+     "Default for",
+     "VLAN 20"
+    ]
+   ]
+  },
+  {
+   "id": "er",
+   "zone": "core",
+   "ico": "ER",
+   "label": "TP-Link ER605",
+   "sub": "dual-WAN router",
+   "x": 310,
+   "y": 145,
+   "desc": "Routes both VLANs and balances them across the two lines. Failover works in both directions: if line 1 fails, VLAN 10 uses line 2; if line 2 fails, VLAN 20 uses line 1.",
+   "facts": [
+    [
+     "WAN ports",
+     "2 (PPPoE + dynamic)"
+    ],
+    [
+     "LAN 1 + 2",
+     "VLAN 10"
+    ],
+    [
+     "LAN 3",
+     "VLAN 20"
+    ],
+    [
+     "Failover",
+     "bi-directional"
+    ]
+   ]
+  },
+  {
+   "id": "sg",
+   "zone": "v10",
+   "ico": "SW",
+   "label": "Core switch",
+   "sub": "managed, 8 ports",
+   "x": 580,
+   "y": 200,
+   "desc": "The central managed switch of the fast network. Port 1 is the uplink from the router; the others go to servers, access points and the room switch.",
+   "facts": [
+    [
+     "Model",
+     "TP-Link TL-SG108E (managed)"
+    ],
+    [
+     "Port 1",
+     "router uplink"
+    ],
+    [
+     "Port 2",
+     "room switch"
+    ],
+    [
+     "Port 3",
+     "Raspberry Pi"
+    ],
+    [
+     "Port 4",
+     "Proxmox host"
+    ],
+    [
+     "Port 5",
+     "family PC"
+    ],
+    [
+     "Port 6",
+     "WiFi 6 access point"
+    ]
+   ]
+  },
+  {
+   "id": "pi",
+   "zone": "v10",
+   "ico": "PI",
+   "label": "Raspberry Pi",
+   "sub": "always-on gateway",
+   "x": 820,
+   "y": 80,
+   "desc": "Runs the dashboard, tunnel, monitoring and the weekly backup. Its address is pinned by a DHCP reservation.",
+   "facts": [
+    [
+     "Port",
+     "switch port 3"
+    ],
+    [
+     "Address",
+     "DHCP reservation"
+    ]
+   ]
+  },
+  {
+   "id": "pve",
+   "zone": "v10",
+   "ico": "PX",
+   "label": "Proxmox host",
+   "sub": "on-demand server",
+   "x": 820,
+   "y": 160,
+   "desc": "The compute and backup server. Has a fixed address and Wake-on-LAN enabled.",
+   "facts": [
+    [
+     "Port",
+     "switch port 4"
+    ],
+    [
+     "Address",
+     "static"
+    ],
+    [
+     "Wakes by",
+     "magic packet from the Pi"
+    ]
+   ]
+  },
+  {
+   "id": "ap1",
+   "zone": "v10",
+   "ico": "A1",
+   "label": "WiFi 6 AP",
+   "sub": "TP-Link EX220",
+   "x": 820,
+   "y": 240,
+   "desc": "Wireless coverage for the house. Runs in access-point mode: no routing, no DHCP, just a bridge to the switch.",
+   "facts": [
+    [
+     "Port",
+     "switch port 6"
+    ],
+    [
+     "Mode",
+     "access point"
+    ]
+   ]
+  },
+  {
+   "id": "fam",
+   "zone": "v10",
+   "ico": "PC",
+   "label": "Family PC",
+   "sub": "wired",
+   "x": 820,
+   "y": 320,
+   "desc": "A desktop on the fast network.",
+   "facts": [
+    [
+     "Port",
+     "switch port 5"
+    ]
+   ]
+  },
+  {
+   "id": "rsw",
+   "zone": "v10",
+   "ico": "RS",
+   "label": "Room switch",
+   "sub": "unmanaged, 5 ports",
+   "x": 820,
+   "y": 400,
+   "desc": "A small unmanaged switch in the study, uplinked from core switch port 2.",
+   "facts": [
+    [
+     "Model",
+     "TP-Link LS105G"
+    ],
+    [
+     "Uplink",
+     "core switch port 2"
+    ]
+   ]
+  },
+  {
+   "id": "ws",
+   "zone": "v10",
+   "ico": "WS",
+   "label": "Workstations",
+   "sub": "desktop + laptop",
+   "x": 1110,
+   "y": 340,
+   "desc": "A personal workstation and an office laptop, wired to the room switch.",
+   "facts": [
+    [
+     "Ports",
+     "room switch 2 and 4"
+    ]
+   ]
+  },
+  {
+   "id": "ap2",
+   "zone": "v10",
+   "ico": "A2",
+   "label": "WiFi 6 AP",
+   "sub": "TP-Link AX10",
+   "x": 1110,
+   "y": 420,
+   "desc": "A second WiFi 6 access point, wired to the room switch, also in access-point mode.",
+   "facts": [
+    [
+     "Port",
+     "room switch 3"
+    ],
+    [
+     "Mode",
+     "access point"
+    ]
+   ]
+  },
+  {
+   "id": "ts",
+   "zone": "over",
+   "ico": "TS",
+   "label": "Tailscale",
+   "sub": "private mesh VPN",
+   "x": 1110,
+   "y": 100,
+   "desc": "A WireGuard-based mesh that gives private, end-to-end encrypted access from anywhere. Installed on the Pi, the Proxmox host and some containers; no router ports are opened.",
+   "facts": [
+    [
+     "Where",
+     "Pi, Proxmox host, dev container, Docs container, devices"
+    ],
+    [
+     "Used for",
+     "dashboard, Proxmox UI, code-server, Docs editor"
+    ]
+   ],
+   "layer": "overlay"
+  },
+  {
+   "id": "cft",
+   "zone": "over",
+   "ico": "CF",
+   "label": "Cloudflare tunnels",
+   "sub": "outbound tunnels",
+   "x": 1110,
+   "y": 190,
+   "desc": "Two outbound tunnels (one on the Pi, one in the Docs container) publish selected pages without any inbound port forwarding.",
+   "facts": [
+    [
+     "Direction",
+     "outbound only"
+    ],
+    [
+     "Used for",
+     "the public portfolio and published Docs pages"
+    ]
+   ],
+   "layer": "overlay"
+  },
+  {
+   "id": "tenda",
+   "zone": "v20",
+   "ico": "SW",
+   "label": "IoT switch",
+   "sub": "unmanaged 100 Mbps",
+   "x": 580,
+   "y": 590,
+   "desc": "An eight-port 100 Mbps switch for the cameras and the second-floor access point. Slow is fine, and keeping it on its own VLAN keeps its traffic away from the servers.",
+   "facts": [
+    [
+     "Model",
+     "Tenda 8-port"
+    ],
+    [
+     "Uplink",
+     "router LAN 3"
+    ]
+   ]
+  },
+  {
+   "id": "dvr",
+   "zone": "v20",
+   "ico": "DV",
+   "label": "Camera DVR",
+   "sub": "recorder",
+   "x": 820,
+   "y": 570,
+   "desc": "The surveillance recorder.",
+   "facts": [
+    [
+     "Port",
+     "IoT switch port 2"
+    ]
+   ]
+  },
+  {
+   "id": "ap3",
+   "zone": "v20",
+   "ico": "A3",
+   "label": "Floor-2 AP",
+   "sub": "router in AP mode",
+   "x": 820,
+   "y": 650,
+   "desc": "A spare router running as an access point to cover the other floor.",
+   "facts": [
+    [
+     "Port",
+     "IoT switch port 3"
+    ],
+    [
+     "Mode",
+     "access point"
+    ]
+   ]
+  }
+ ],
+ "edges": [
+  {
+   "from": "isp1",
+   "to": "er",
+   "label": "fiber"
+  },
+  {
+   "from": "isp2",
+   "to": "er",
+   "label": "30 Mbps"
+  },
+  {
+   "from": "er",
+   "to": "sg",
+   "label": "VLAN 10 uplink"
+  },
+  {
+   "from": "er",
+   "to": "tenda",
+   "label": "VLAN 20 uplink",
+   "via": [
+    [
+     400,
+     617
+    ]
+   ]
+  },
+  {
+   "from": "sg",
+   "to": "pi",
+   "label": "port 3"
+  },
+  {
+   "from": "sg",
+   "to": "pve",
+   "label": "port 4"
+  },
+  {
+   "from": "sg",
+   "to": "ap1",
+   "label": "port 6"
+  },
+  {
+   "from": "sg",
+   "to": "fam",
+   "label": "port 5"
+  },
+  {
+   "from": "sg",
+   "to": "rsw",
+   "label": "port 2"
+  },
+  {
+   "from": "rsw",
+   "to": "ws",
+   "label": "gigabit"
+  },
+  {
+   "from": "rsw",
+   "to": "ap2",
+   "label": "gigabit"
+  },
+  {
+   "from": "pi",
+   "to": "ts",
+   "label": "mesh VPN",
+   "style": "dashed",
+   "layer": "overlay"
+  },
+  {
+   "from": "pi",
+   "to": "cft",
+   "label": "tunnel",
+   "style": "dashed",
+   "layer": "overlay"
+  },
+  {
+   "from": "pve",
+   "to": "cft",
+   "label": "Docs tunnel",
+   "style": "dashed",
+   "layer": "overlay"
+  },
+  {
+   "from": "tenda",
+   "to": "dvr",
+   "label": "port 2"
+  },
+  {
+   "from": "tenda",
+   "to": "ap3",
+   "label": "port 3"
+  }
+ ],
+ "flows": [
+  {
+   "name": "A normal day",
+   "steps": [
+    [
+     0,
+     "VLAN 10 (servers, workstations) leaves through the 1 Gbps fiber."
+    ],
+    [
+     1,
+     "VLAN 20 (cameras, IoT) uses the slower 30 Mbps line, so it can never starve the fast network."
+    ],
+    [
+     2,
+     "The router hands VLAN 10 to the managed switch, which fans out to the Pi, the Proxmox host and the access points."
+    ]
+   ]
+  },
+  {
+   "name": "Fiber line fails",
+   "steps": [
+    [
+     0,
+     "The router notices that WAN 1 is down."
+    ],
+    [
+     1,
+     "VLAN 10 traffic fails over to the 30 Mbps line: slower, but everything keeps working."
+    ],
+    [
+     2,
+     "Devices keep their addresses; nothing needs reconfiguring."
+    ]
+   ]
+  },
+  {
+   "name": "Wake the server",
+   "steps": [
+    [
+     4,
+     "The Pi sends a Wake-on-LAN magic packet from switch port 3."
+    ],
+    [
+     5,
+     "The switch delivers it on the same VLAN to the Proxmox host's network card, which powers the machine on."
+    ]
+   ]
+  }
+ ]
+};
+/* ============================ 2. ENGINE (usually leave as is) ============================ */
+const NW = 180, NH = 54, $ = (s, r = document) => r.querySelector(s);
+const byId = Object.fromEntries(DATA.nodes.map((n) => [n.id, n]));
+const svg = $("#svg"), NS = "http://www.w3.org/2000/svg";
+const state = { sel: null, hidden: new Set(), q: "", flow: 0, step: -1, timer: null };
+function mk(tag, attrs, parent, text) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; if (parent) parent.appendChild(e); return e; }
+function h(tag, attrs, ...kids) { const e = document.createElement(tag); for (const k in (attrs || {})) { if (k === "class") e.className = attrs[k]; else if (k.startsWith("on")) e[k] = attrs[k]; else e.setAttribute(k, attrs[k]); } for (const c of kids.flat()) if (c != null) e.append(c.nodeType ? c : document.createTextNode(c)); return e; }
+
+function edgeGeom(e) {
+  const a = byId[e.from], b = byId[e.to];
+  const edge = (n, tx, ty) => { // point where the line from the node centre toward (tx,ty) leaves the box
+    const px = n.x + NW / 2, py = n.y + NH / 2, vx = tx - px, vy = ty - py;
+    const t = Math.min((NW / 2 + 3) / (Math.abs(vx) || 1e-6), (NH / 2 + 3) / (Math.abs(vy) || 1e-6));
+    return [px + vx * t, py + vy * t];
+  };
+  const ax = a.x + NW / 2, ay = a.y + NH / 2, bx = b.x + NW / 2, by = b.y + NH / 2;
+  if (e.via && e.via.length) { // waypoints [[x,y],...]: route around nodes instead of cutting across them
+    const first = e.via[0], last = e.via[e.via.length - 1];
+    const [x1, y1] = edge(a, first[0], first[1]), [x2, y2] = edge(b, last[0], last[1]);
+    const pts = [[x1, y1], ...e.via, [x2, y2]];
+    let best = 0, bl = -1; for (let i = 0; i < pts.length - 1; i++) { const l = Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]); if (l > bl) { bl = l; best = i; } }
+    return { d: "M" + pts.map((p) => p.join(",")).join(" L"), lx: (pts[best][0] + pts[best + 1][0]) / 2, ly: (pts[best][1] + pts[best + 1][1]) / 2 - 5 };
+  }
+  const reverse = DATA.edges.some((o) => o.from === e.to && o.to === e.from);
+  const bend = e.bend ?? (reverse ? 16 : 0);
+  const dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy) || 1;
+  const cx = (ax + bx) / 2 + (-dy / len) * bend * 2, cy = (ay + by) / 2 + (dx / len) * bend * 2;
+  const [x1, y1] = edge(a, cx, cy), [x2, y2] = edge(b, cx, cy);
+  const d = bend ? `M${x1},${y1} Q${cx},${cy} ${x2},${y2}` : `M${x1},${y1} L${x2},${y2}`;
+  const lx = bend ? 0.25 * x1 + 0.5 * cx + 0.25 * x2 : (x1 + x2) / 2, ly = (bend ? 0.25 * y1 + 0.5 * cy + 0.25 * y2 : (y1 + y2) / 2) - 5;
+  return { d, lx, ly };
+}
+
+function draw() {
+  svg.replaceChildren();
+  svg.setAttribute("viewBox", `0 0 ${DATA.view.w} ${DATA.view.h}`);
+  svg.style.setProperty("--minw", Math.min(DATA.view.w, 1100) * 0.9 + "px"); // phones scroll the diagram inside its frame instead of shrinking the text
+  const defs = mk("defs", {}, svg);
+  for (const [id, cls] of [["ar", "arrow"], ["arh", "arrow hi"]]) {
+    const m = mk("marker", { id, viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 8, markerHeight: 8, orient: "auto-start-reverse" }, defs);
+    mk("path", { d: "M0,0 L10,5 L0,10 z", class: cls, style: `fill:var(${id === "ar" ? "--muted" : "--accent"})` }, m);
+  }
+  for (const z of DATA.zones) {
+    const g = mk("g", { class: "zone" + (z.tone ? " t-" + z.tone : "") }, svg);
+    mk("rect", { x: z.x, y: z.y, width: z.w, height: z.h, rx: 6 }, g);
+    mk("text", { x: z.x + 12, y: z.y + 20 }, g, z.label);
+  }
+  const edgeEls = DATA.edges.map((e, i) => {
+    const g = mk("g", { class: "edge" + (e.style === "dashed" ? " dashed" : ""), "data-i": i }, svg);
+    const gm = edgeGeom(e);
+    const p = mk("path", { d: gm.d, "marker-end": "url(#ar)" }, g);
+    if (e.both) p.setAttribute("marker-start", "url(#ar)");
+    if (e.label) mk("text", { x: gm.lx, y: gm.ly }, g, e.label);
+    return g;
+  });
+  const nodeEls = DATA.nodes.map((n) => {
+    const g = mk("g", { class: "node", tabindex: 0, role: "button", "data-id": n.id, "aria-label": `${n.label}: ${n.sub || ""}` }, svg);
+    mk("rect", { class: "box", x: n.x, y: n.y, width: NW, height: NH, rx: 5 }, g);
+    mk("rect", { class: "ico", x: n.x + 9, y: n.y + 12, width: 30, height: 30, rx: 4 }, g);
+    mk("text", { class: "i", x: n.x + 24, y: n.y + 31 }, g, n.ico || n.label.slice(0, 2).toUpperCase());
+    mk("text", { class: "n", x: n.x + 48, y: n.y + 24 }, g, n.label);
+    mk("text", { class: "s", x: n.x + 48, y: n.y + 40 }, g, n.sub || "");
+    g.addEventListener("click", (ev) => { ev.stopPropagation(); select(n.id); });
+    g.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); select(n.id); } });
+    g.addEventListener("mouseenter", () => focusOn(n.id)); g.addEventListener("mouseleave", () => focusOn(state.sel));
+    g.addEventListener("focus", () => focusOn(n.id)); g.addEventListener("blur", () => focusOn(state.sel));
+    return g;
+  });
+  svg.addEventListener("click", () => select(null));
+  draw.edgeEls = edgeEls; draw.nodeEls = nodeEls;
+  applyVisibility();
+}
+
+function visibleNode(n) { return (!n.layer || !state.hidden.has(n.layer)) && (!state.q || (n.label + " " + (n.sub || "") + " " + (n.desc || "")).toLowerCase().includes(state.q)); }
+function applyVisibility() {
+  DATA.nodes.forEach((n, i) => { const on = visibleNode(n) || (state.q && false); draw.nodeEls[i].style.display = (!n.layer || !state.hidden.has(n.layer)) ? "" : "none"; draw.nodeEls[i].style.opacity = on ? "" : ".25"; });
+  DATA.edges.forEach((e, i) => { const hide = (e.layer && state.hidden.has(e.layer)) || (byId[e.from].layer && state.hidden.has(byId[e.from].layer)) || (byId[e.to].layer && state.hidden.has(byId[e.to].layer)); draw.edgeEls[i].style.display = hide ? "none" : ""; });
+}
+function focusOn(id) {
+  const rel = new Set(id ? [id] : []);
+  DATA.edges.forEach((e, i) => { const hit = id && (e.from === id || e.to === id); const el = draw.edgeEls[i]; el.classList.toggle("hi", !!hit); el.querySelector("path").setAttribute("marker-end", hit ? "url(#arh)" : "url(#ar)"); if (hit) { rel.add(e.from); rel.add(e.to); } });
+  DATA.nodes.forEach((n, i) => draw.nodeEls[i].classList.toggle("rel", rel.has(n.id)));
+  svg.classList.toggle("focus", !!id);
+}
+function select(id) {
+  state.sel = id; stopFlow();
+  DATA.nodes.forEach((n, i) => draw.nodeEls[i].classList.toggle("sel", n.id === id));
+  focusOn(id); renderDetail();
+}
+function renderDetail() {
+  const box = $("#detail"), n = byId[state.sel];
+  if (!n) { box.replaceChildren(h("div", { class: "eyebrow" }, "Details"), h("h2", {}, DATA.title), h("p", { class: "muted" }, "Select a component to see what it does, its settings and what it talks to."),
+    h("div", { class: "tiles" }, h("div", { class: "tile" }, h("div", { class: "k" }, "Components"), h("div", { class: "v" }, DATA.nodes.length)), h("div", { class: "tile" }, h("div", { class: "k" }, "Connections"), h("div", { class: "v" }, DATA.edges.length)))); return; }
+  const out = DATA.edges.filter((e) => e.from === n.id), inc = DATA.edges.filter((e) => e.to === n.id);
+  const link = (otherId, e) => h("li", {}, h("button", { onclick: () => select(otherId) }, h("span", { class: "lbl" }, e.label || ""), byId[otherId].label));
+  box.replaceChildren(...[
+    h("div", { class: "eyebrow" }, (DATA.zones.find((z) => z.id === n.zone) || {}).label || "Component"),
+    h("h2", {}, n.label), n.sub ? h("div", { class: "mono muted", style: "font-size:12.5px" }, n.sub) : null,
+    h("p", {}, n.desc || ""),
+    n.facts && n.facts.length ? h("dl", {}, n.facts.flatMap(([k, v]) => [h("dt", {}, k), h("dd", {}, v)])) : null,
+    out.length ? h("div", {}, h("div", { class: "eyebrow" }, "Talks to"), h("ul", { class: "links" }, out.map((e) => link(e.to, e)))) : null,
+    inc.length ? h("div", { style: "margin-top:12px" }, h("div", { class: "eyebrow" }, "Called by"), h("ul", { class: "links" }, inc.map((e) => link(e.from, e)))) : null].filter(Boolean));
+}
+
+/* walk-through */
+function stopFlow() { clearInterval(state.timer); state.timer = null; $("#play").textContent = "▶ Play"; }
+function showStep() {
+  const f = DATA.flows[state.flow]; if (!f) return;
+  draw.edgeEls.forEach((el) => el.classList.remove("step"));
+  if (state.step < 0) { $("#stepcap").textContent = f.steps.length + " steps. Press Play or use ◀ ▶|."; return; }
+  const [ei, text] = f.steps[state.step];
+  draw.edgeEls[ei].classList.add("step");
+  $("#stepcap").textContent = `Step ${state.step + 1} of ${f.steps.length}: ${text}`;
+  const e = DATA.edges[ei]; state.sel = null; focusOn(null); svg.classList.add("focus");
+  DATA.nodes.forEach((n, i) => draw.nodeEls[i].classList.toggle("rel", n.id === e.from || n.id === e.to));
+}
+function stepBy(d) { const f = DATA.flows[state.flow]; if (!f) return; state.step = Math.min(f.steps.length - 1, Math.max(-1, state.step + d)); showStep(); }
+function play() {
+  if (state.timer) { stopFlow(); return; }
+  const f = DATA.flows[state.flow]; if (!f) return;
+  state.step = -1; $("#play").textContent = "❚❚ Pause";
+  const tick = () => { if (state.step >= f.steps.length - 1) { stopFlow(); return; } stepBy(1); };
+  tick(); state.timer = setInterval(tick, 1800);
+}
+
+/* table view */
+function drawTable() {
+  const t = $("#tbl"); t.replaceChildren(h("thead", {}, h("tr", {}, ["Component", "Where", "What it does", "Sends data to"].map((c) => h("th", {}, c)))),
+    h("tbody", {}, DATA.nodes.map((n) => h("tr", {}, h("td", {}, h("b", {}, n.label), n.sub ? h("div", { class: "mono muted", style: "font-size:12px" }, n.sub) : null),
+      h("td", {}, (DATA.zones.find((z) => z.id === n.zone) || {}).label || ""), h("td", {}, n.desc || ""),
+      h("td", {}, DATA.edges.filter((e) => e.from === n.id).map((e) => byId[e.to].label).join(", ") || "-")))));
+  $("#count").textContent = DATA.nodes.length + " components, " + DATA.edges.length + " connections";
+}
+
+/* tabs, layers, search, theme, height reporting */
+const REPO = "";
+const VIEWS = [["overview", "Overview"], ["diagram", "Topology"], ["vlans", "VLANs and ports"], ["access", "How you reach things"], ["design", "Design decisions"], ["table", "Components"]];
+function showView(id) { for (const [v] of VIEWS) $("#v-" + v).hidden = v !== id; document.querySelectorAll("#nav button").forEach((b) => b.setAttribute("aria-selected", b.dataset.v === id)); reportHeight(); }
+function setup() {
+  document.title = DATA.title; $("#brand").textContent = DATA.brand; $("#eyebrow").textContent = DATA.eyebrow; $("#title").textContent = DATA.title; $("#subtitle").textContent = DATA.subtitle;
+  $("#nav").replaceChildren(...VIEWS.map(([v, l]) => h("button", { role: "tab", "data-v": v, onclick: () => showView(v) }, l)));
+  $("#layers").replaceChildren(...DATA.layers.map((l) => h("button", { "aria-pressed": "true", onclick: (ev) => { const b = ev.currentTarget, on = b.getAttribute("aria-pressed") !== "true"; b.setAttribute("aria-pressed", on); on ? state.hidden.delete(l.id) : state.hidden.add(l.id); applyVisibility(); } }, l.label)));
+  if (!DATA.layers.length) $("#layers").remove();
+  $("#flowSel").replaceChildren(...DATA.flows.map((f, i) => h("option", { value: i }, f.name)));
+  if (!DATA.flows.length) ["#flowSel", "#prev", "#play", "#next", "label[for=flowSel]"].forEach((s) => $(s).remove());
+  $("#flowSel").onchange = (e) => { stopFlow(); state.flow = +e.target.value; state.step = -1; showStep(); };
+  $("#prev").onclick = () => { stopFlow(); stepBy(-1); }; $("#next").onclick = () => { stopFlow(); stepBy(1); }; $("#play").onclick = play;
+  $("#q").oninput = (e) => { state.q = e.target.value.trim().toLowerCase(); applyVisibility(); };
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { stopFlow(); state.step = -1; select(null); showStep(); } });
+  draw(); drawTable(); renderDetail(); showStep(); showView("overview");
+  if (REPO) { const a = $("#repoLink"); a.href = REPO; a.classList.add("on"); a.target = "_blank"; a.rel = "noopener noreferrer"; $("#repoText").textContent = REPO + "  (copy the address if your Docs page settings block pop-ups)";
+    const top = document.createElement("a"); top.className = "btn sm"; top.href = REPO; top.target = "_blank"; top.rel = "noopener noreferrer"; top.textContent = "GitHub"; $("#themeBtn").before(top); }
+}
+
+/* Theme + height protocol used when this page is shown inside Homelab Hub Docs (a sandboxed iframe). Works standalone too. */
+const root = document.documentElement; let themeMode = 0; // 0 system, 1 light, 2 dark
+function applyTheme(t) { t ? root.setAttribute("data-theme", t) : root.removeAttribute("data-theme"); $("#themeBtn").textContent = "Theme: " + (themeMode === 0 ? "system" : themeMode === 1 ? "light" : "dark"); }
+const fromUrl = new URLSearchParams(location.search).get("theme");
+if (fromUrl === "dark" || fromUrl === "light") { themeMode = fromUrl === "dark" ? 2 : 1; }
+addEventListener("message", (e) => { if (e.source === parent && e.data && e.data.type === "hub:theme") { themeMode = e.data.theme === "dark" ? 2 : 1; applyTheme(e.data.theme); } });
+$("#themeBtn").onclick = () => { themeMode = (themeMode + 1) % 3; applyTheme(themeMode === 0 ? null : themeMode === 1 ? "light" : "dark"); };
+function reportHeight() { try { parent.postMessage({ type: "hub:height", px: Math.ceil(Math.max(root.scrollHeight, document.body.scrollHeight)) }, "*"); } catch (_) {} }
+if (window.ResizeObserver) new ResizeObserver(reportHeight).observe(root);
+addEventListener("load", reportHeight);
+
+setup(); applyTheme(themeMode === 0 ? null : themeMode === 1 ? "light" : "dark");
+
+/* filter bars: <div data-filter="tbodyId" data-count="spanId"> with buttons data-f; rows carry data-cat */
+document.querySelectorAll("[data-filter]").forEach((bar) => {
+  const tb = document.getElementById(bar.dataset.filter), rows = [...tb.querySelectorAll("tr")], out = document.getElementById(bar.dataset.count);
+  const apply = (f) => { let n = 0; rows.forEach((r) => { const on = f === "all" || r.dataset.cat.split(" ").includes(f); r.hidden = !on; if (on) n++; });
+    if (out) out.textContent = n + " of " + rows.length; bar.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.f === f)); reportHeight(); };
+  bar.querySelectorAll("button").forEach((b) => (b.onclick = () => apply(b.dataset.f))); apply("all");
+});
+</script>
+</body>
+</html>

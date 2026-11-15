@@ -1,0 +1,688 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Showcase Docs: architecture and design</title>
+<style>
+/* Valhalla-inspired tokens. Parchment (light) is the base; stone (dark) overrides below (system, then explicit). */
+:root {
+  --bg: #e7e1d5; --surface: #f2eee5; --surface2: #e0d9cb; --ink: #191c1b; --muted: #5a605d; --line: #c2baa9;
+  --accent: #067f72; --accent-ink: #f4f1ea; --accent-soft: #d3e4dc;
+  --ok: #2f7a36; --warn: #9a6408; --bad: #a8322a; --info: #23688f;
+  --ok-soft: #dbe8d3; --warn-soft: #f0e2c2; --bad-soft: #f0d6cf; --info-soft: #d5e2e6;
+  --code-bg: #0a181c; --code-ink: #dfe7e4;
+  --shadow: none;
+  --radius: 0px; --radius-lg: 0px;
+  --f-display: "Cormorant Garamond", "Palatino Linotype", Palatino, "Book Antiqua", "P052", Georgia, serif;
+  --f-body: "Barlow", "DIN Alternate", Bahnschrift, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: light; --ember: #b4531a; --gold: #8a6a2a;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #061215; --surface: #0a181c; --surface2: #10262b; --ink: #dfe7e4; --muted: #8b9b98; --line: #1c383e;
+    --accent: #40c1ac; --accent-ink: #03110f; --accent-soft: #0d2c2b; --ok: #9ad17a; --warn: #e5b04a; --bad: #e0564a; --info: #6ab8e6;
+    --ok-soft: #17291a; --warn-soft: #2e2613; --bad-soft: #321715; --info-soft: #12283a; --code-bg: #020607; --code-ink: #dfe7e4;
+    --shadow: none; color-scheme: dark; --ember: #e0752a; --gold: #c9a45c;
+}
+}
+:root[data-theme="dark"] {
+  --bg: #061215; --surface: #0a181c; --surface2: #10262b; --ink: #dfe7e4; --muted: #8b9b98; --line: #1c383e;
+  --accent: #40c1ac; --accent-ink: #03110f; --accent-soft: #0d2c2b; --ok: #9ad17a; --warn: #e5b04a; --bad: #e0564a; --info: #6ab8e6;
+  --ok-soft: #17291a; --warn-soft: #2e2613; --bad-soft: #321715; --info-soft: #12283a; --code-bg: #020607; --code-ink: #dfe7e4;
+  --shadow: none; color-scheme: dark; --ember: #e0752a; --gold: #c9a45c;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 var(--f-body); }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+a { color: var(--accent); }
+h1, h2, h3 { font-family: var(--f-display); line-height: 1.2; margin: 0; }
+.mono { font-family: var(--f-mono); }
+.muted { color: var(--muted); }
+.grow { flex: 1; }
+.eyebrow { font: 500 11px var(--f-mono); text-transform: uppercase; letter-spacing: .09em; color: var(--muted); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* ---- top bar + tabs ---- */
+.bar { position: sticky; top: 0; z-index: 20; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 10px 16px; background: var(--bg); border-bottom: 1px solid var(--line); }
+.brand { font: 700 15px var(--f-display); display: flex; gap: 8px; align-items: center; margin-right: 10px; }
+.brand i { width: 12px; height: 12px; background: var(--accent); display: inline-block; border-radius: var(--radius); }
+.nav { display: flex; gap: 2px; flex-wrap: wrap; }
+.nav button { background: none; border: 0; padding: 6px 12px; color: var(--muted); border-radius: var(--radius); font-weight: 500; }
+.nav button[aria-selected="true"] { color: var(--ink); background: var(--surface2); }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 18px 16px 48px; }
+.head { margin: 0 0 16px; }
+.head h1 { font-size: clamp(1.4rem, 3vw, 1.9rem); font-weight: 700; }
+.sub { color: var(--muted); margin: 6px 0 0; max-width: 70ch; }
+.view[hidden] { display: none; }
+
+/* ---- controls ---- */
+.btn { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 6px 12px; font-size: 14px; font-weight: 500; white-space: nowrap; }
+.btn:hover { border-color: var(--ink); }
+.btn.pri { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+.btn.sm { padding: 3px 9px; font-size: 13px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; flex-wrap: wrap; }
+.seg button { border: 0; background: var(--surface); padding: 6px 12px; font-size: 13px; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.search { padding: 7px 10px; border: 1px solid var(--line); background: var(--surface); border-radius: var(--radius); min-width: min(100%, 220px); }
+.pill { font: 500 10.5px var(--f-mono); text-transform: uppercase; letter-spacing: .06em; padding: 1px 6px; border-radius: 2px; background: var(--surface2); color: var(--muted); white-space: nowrap; display: inline-block; }
+.pill.ok { background: var(--ok-soft); color: var(--ok); } .pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.bad { background: var(--bad-soft); color: var(--bad); } .pill.info { background: var(--info-soft); color: var(--info); }
+.pill.acc { background: var(--accent-soft); color: var(--accent); }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 0 0 14px; }
+.banner { border: 1px solid var(--line); border-left: 4px solid var(--info); background: var(--surface); padding: 8px 12px; border-radius: var(--radius); font-size: 14px; margin: 0 0 14px; }
+.banner.warn { border-left-color: var(--warn); } .banner.ok { border-left-color: var(--ok); } .banner.bad { border-left-color: var(--bad); }
+.callout { border-left: 4px solid var(--info); background: var(--info-soft); padding: 10px 14px; border-radius: var(--radius); margin: 12px 0; font-size: 14.5px; }
+.callout.warn { border-color: var(--warn); background: var(--warn-soft); } .callout.tip { border-color: var(--ok); background: var(--ok-soft); } .callout.danger { border-color: var(--bad); background: var(--bad-soft); }
+
+/* ---- panes, tiles, tables, code ---- */
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; align-items: start; }
+.pane { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 16px; box-shadow: var(--shadow); min-width: 0; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 0 0 16px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; }
+.tile .k { font: 500 11px var(--f-mono); text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+.tile .v { font: 600 1.3rem var(--f-display); font-variant-numeric: tabular-nums; margin-top: 2px; }
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+th { background: var(--surface2); font-weight: 600; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+code { font-family: var(--f-mono); font-size: 13px; background: var(--surface2); padding: 1px 5px; border-radius: 3px; }
+.codeblock { background: var(--code-bg); color: var(--code-ink); border-radius: var(--radius-lg); margin: 10px 0; overflow: hidden; }
+.codeblock pre { margin: 0; padding: 12px; overflow-x: auto; font: 13px/1.5 var(--f-mono); }
+
+/* ---- diagram ---- */
+.stage { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-lg); overflow-x: auto; }
+.stage svg { display: block; width: 100%; height: auto; }
+.zone rect { fill: var(--surface); stroke: var(--line); stroke-width: 1.2; stroke-dasharray: 5 4; }
+.zone.t-accent rect { fill: var(--accent-soft); } .zone.t-info rect { fill: var(--info-soft); }
+.zone.t-ok rect { fill: var(--ok-soft); } .zone.t-warn rect { fill: var(--warn-soft); } .zone.t-bad rect { fill: var(--bad-soft); }
+.zone text { font: 500 11px var(--f-mono); letter-spacing: .08em; text-transform: uppercase; fill: var(--muted); }
+.node { cursor: pointer; transition: opacity .15s; }
+.node rect.box { fill: var(--surface); stroke: var(--line); stroke-width: 1.2; }
+.node:hover rect.box, .node:focus-visible rect.box { stroke: var(--accent); }
+.node.sel rect.box { stroke: var(--accent); stroke-width: 2.4; fill: var(--accent-soft); }
+.node rect.ico { fill: var(--accent-soft); } .node.sel rect.ico { fill: var(--surface); }
+.node text.i { font: 700 11px var(--f-mono); fill: var(--accent); text-anchor: middle; }
+.node text.n { font: 600 13px var(--f-body); fill: var(--ink); }
+.node text.s { font: 400 10.5px var(--f-mono); fill: var(--muted); }
+.edge path { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-linejoin: round; }
+.edge.dashed path { stroke-dasharray: 6 4; }
+.edge text { font: 500 10.5px var(--f-mono); fill: var(--muted); text-anchor: middle; paint-order: stroke; stroke: var(--bg); stroke-width: 5px; stroke-linejoin: round; }
+.edge.hi path { stroke: var(--accent); stroke-width: 2.4; }
+.edge.hi text { fill: var(--accent); }
+svg.focus .node:not(.rel), svg.focus .edge:not(.hi) { opacity: .28; }
+.edge.step path { stroke: var(--accent); stroke-width: 3; stroke-dasharray: 8 6; animation: flow .7s linear infinite; }
+@keyframes flow { to { stroke-dashoffset: -14; } }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); margin-top: 10px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 22px; height: 0; border-top: 2px solid var(--muted); display: inline-block; }
+.legend i.d { border-top-style: dashed; }
+.detail h2 { font-size: 1.15rem; margin: 6px 0 4px; }
+.detail dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 10px 0; font-size: 13.5px; }
+.detail dt { font: 500 11px var(--f-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding-top: 2px; }
+.detail dd { margin: 0; }
+.links { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 6px; }
+.links button { width: 100%; text-align: left; background: var(--surface2); border: 1px solid transparent; border-radius: var(--radius); padding: 6px 10px; font-size: 13.5px; }
+.links button:hover { border-color: var(--accent); }
+.links .lbl { font: 400 11px var(--f-mono); color: var(--muted); display: block; }
+.stepcap { font-size: 14px; min-height: 2.9em; margin: 8px 0 0; }
+
+@media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); } .stage svg { min-width: var(--minw, 760px); } }
+@media (prefers-reduced-motion: reduce) { .edge.step path { animation: none; } .node { transition: none; } }
+
+/* ---- page specific ---- */
+.steps { display: grid; grid-template-columns: 260px minmax(0,1fr); gap: 18px; align-items: start; }
+.steplist { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.steplist button { width: 100%; text-align: left; display: flex; gap: 10px; align-items: baseline; background: var(--surface); border: 1px solid var(--line); padding: 8px 10px; border-radius: var(--radius); }
+.steplist button .num { font: 600 1.05rem var(--f-display); color: var(--accent); min-width: 1.4em; font-variant-numeric: lining-nums; }
+.steplist button[aria-current="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.steplist button:hover { border-color: var(--accent); }
+.sims { margin-top: 18px; }
+.filerow { display: grid; grid-template-columns: 74px minmax(0,1fr) auto; gap: 10px; align-items: baseline; padding: 5px 10px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.filerow:last-child { border-bottom: 0; }
+.filerow code { background: none; padding: 0; overflow-wrap: anywhere; }
+.tree { list-style: none; margin: 0; padding: 0; font: 13.5px/1.35 var(--f-mono); }
+.tree ul { list-style: none; margin: 0; padding-left: 18px; border-left: 1px dashed var(--line); margin-left: 6px; }
+.tree button { background: none; border: 0; padding: 4px 6px; text-align: left; color: var(--ink); border-radius: var(--radius); display: inline-flex; gap: 8px; align-items: baseline; }
+.tree button:hover { background: var(--surface2); }
+.tree button[aria-current="true"] { background: var(--accent-soft); color: var(--accent); }
+.tree .k { font-size: 11px; color: var(--muted); }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); gap: 12px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--accent); padding: 12px 14px; }
+.card h3 { font-size: 1.1rem; margin: 4px 0 6px; }
+.card p { margin: 6px 0; font-size: 14px; }
+.card .why { color: var(--ink); }
+.card .cost { color: var(--muted); font-size: 13px; }
+.card[hidden] { display: none; }
+.split { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 18px; align-items: start; }
+.h2s { font: 600 1.25rem var(--f-display); letter-spacing: .06em; margin: 22px 0 10px; }
+@media (max-width: 900px) { .steps { grid-template-columns: minmax(0,1fr); } .filerow { grid-template-columns: minmax(0,1fr); gap: 2px; } .filerow .pill { justify-self: start; } }
+/* ==== Valhalla skin ==== */
+body { background-image: radial-gradient(90% 420px at 50% 0, color-mix(in srgb, var(--accent) 15%, transparent), transparent 72%); background-repeat: no-repeat; }
+h1, h2, h3 { font-weight: 600; letter-spacing: .04em; font-variant-numeric: lining-nums; }
+.head h1 { font-weight: 500; font-size: clamp(1.6rem, 3.4vw, 2.5rem); text-transform: uppercase; letter-spacing: .12em; color: var(--accent); }
+.eyebrow, .tile .k, .pill, th { font-family: var(--f-body); letter-spacing: .16em; }
+.bar { background: color-mix(in srgb, var(--bg) 94%, transparent); }
+.brand { font: 600 16px var(--f-display); letter-spacing: .16em; text-transform: uppercase; }
+.brand i { width: 20px; height: 22px; border-radius: 0; background: var(--accent); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 108'%3E%3Cpath d='M 44.5 20 L 55.5 20 L 56.5 74 L 50 92 L 43.5 74 Z M 50 4 L 43 12 C 33 13 21 10 9 3 C 3 16 6 31 17 42 C 23 30 33 23 44.5 22 L 50 22 Z M 50 4 L 57 12 C 67 13 79 10 91 3 C 97 16 94 31 83 42 C 77 30 67 23 55.5 22 L 50 22 Z M 22 92 C 33 100 44 101.5 50 97.5 C 56 101.5 67 100 78 92 C 68 105 57 106 50 102 C 43 106 32 105 22 92 Z'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 108'%3E%3Cpath d='M 44.5 20 L 55.5 20 L 56.5 74 L 50 92 L 43.5 74 Z M 50 4 L 43 12 C 33 13 21 10 9 3 C 3 16 6 31 17 42 C 23 30 33 23 44.5 22 L 50 22 Z M 50 4 L 57 12 C 67 13 79 10 91 3 C 97 16 94 31 83 42 C 77 30 67 23 55.5 22 L 50 22 Z M 22 92 C 33 100 44 101.5 50 97.5 C 56 101.5 67 100 78 92 C 68 105 57 106 50 102 C 43 106 32 105 22 92 Z'/%3E%3C/svg%3E") center / contain no-repeat; }
+.nav button { text-transform: uppercase; letter-spacing: .16em; font-size: 12px; border-radius: 0; }
+.nav button[aria-selected="true"] { background: none; color: var(--ink); box-shadow: inset 0 -2px 0 var(--accent); }
+.btn { text-transform: uppercase; letter-spacing: .12em; font-size: 12px; }
+.btn.sm { font-size: 11px; }
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn.pri:hover { color: var(--accent-ink); }
+.seg button { text-transform: uppercase; letter-spacing: .1em; font-size: 11.5px; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.pane { box-shadow: none; background: linear-gradient(180deg, color-mix(in srgb, var(--surface2) 70%, var(--surface)), var(--surface)); border-image: linear-gradient(135deg, var(--accent), var(--line) 14px, var(--line) calc(100% - 14px), var(--accent)) 1; }
+.tile { background: linear-gradient(180deg, color-mix(in srgb, var(--surface2) 70%, var(--surface)), var(--surface)); }
+.tile .v { font-size: 1.55rem; font-variant-numeric: lining-nums tabular-nums; }
+th { background: transparent; font-weight: 500; font-size: 11px; text-transform: uppercase; color: var(--muted); }
+.stage { background: color-mix(in srgb, var(--surface) 55%, var(--bg)); }
+.zone rect, .node rect.box, .node rect.ico { rx: 0; ry: 0; }
+.zone text { font-family: var(--f-body); letter-spacing: .18em; }
+.node text.i { font-family: var(--f-display); font-size: 13px; }
+.node.sel rect.box { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 60%, transparent)); }
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <span class="brand"><i></i><span id="brand">Showcase Docs</span></span>
+  <nav class="nav" id="nav" role="tablist" aria-label="Views"></nav>
+  <span class="grow"></span>
+  <button class="btn sm" id="themeBtn" title="Switch theme">Theme: system</button>
+</header>
+
+<main class="wrap">
+  <div class="head">
+    <div class="eyebrow" id="eyebrow">Architecture</div>
+    <h1 id="title">Example system</h1>
+    <p class="sub" id="subtitle"></p>
+  </div>
+
+  <!-- View 1: the interactive diagram. Add more <section class="view" id="v-..."> blocks for extra tabs. -->
+  <section class="view" id="v-diagram">
+    <div class="toolbar">
+      <div class="seg" id="layers" role="group" aria-label="Layers"></div>
+      <input class="search" id="q" type="search" placeholder="Find a component…" aria-label="Find a component">
+      <span class="grow"></span>
+      <label class="muted" for="flowSel" style="font-size:13px">Walk through</label>
+      <select class="search" id="flowSel" style="min-width:0"></select>
+      <button class="btn sm" id="prev" aria-label="Previous step">◀</button>
+      <button class="btn sm pri" id="play">▶ Play</button>
+      <button class="btn sm" id="next" aria-label="Next step">▶|</button>
+    </div>
+    <div class="layout">
+      <div>
+        <div class="stage"><svg id="svg" role="img" aria-label="System diagram"></svg></div>
+        <p class="stepcap" id="stepcap" aria-live="polite"></p>
+        <div class="legend">
+          <span><i></i> request / data</span><span><i class="d"></i> async / optional</span>
+          <span>Click a box for details · hover to trace its connections · Esc clears</span>
+        </div>
+      </div>
+      <aside class="pane detail" id="detail" aria-live="polite"></aside>
+    </div>
+  </section>
+
+  <section class="view" id="v-table" hidden>
+    <div class="toolbar"><span class="muted" id="count"></span></div>
+    <div class="tablewrap"><table id="tbl"></table></div>
+  </section>
+
+  <section class="view" id="v-flow" hidden>
+    <div class="callout tip"><b>The idea:</b> the editor is allowed to be off. After you publish, the finished site lives on GitHub Pages. Pick a step to see what the app does and why, then try the three cases underneath to see how little is uploaded.</div>
+    <div class="steps">
+      <ol class="steplist" id="steplist"></ol>
+      <div class="pane detail" id="stepdetail" aria-live="polite"></div>
+    </div>
+    <div class="sims">
+      <div class="h2s">What gets uploaded?</div>
+      <div class="toolbar">
+        <div class="seg" id="simSeg" role="group" aria-label="Scenario">
+          <button data-s="first" aria-pressed="true">First publish</button>
+          <button data-s="edit">Edit one page</button>
+          <button data-s="same">Nothing changed</button>
+        </div>
+        <span class="muted" id="simSummary" aria-live="polite"></span>
+      </div>
+      <div class="tablewrap" id="simFiles"></div>
+      <p class="muted" style="font-size:13px" id="simNote"></p>
+    </div>
+  </section>
+
+  <section class="view" id="v-tree" hidden>
+    <div class="layout">
+      <div class="pane">
+        <div class="eyebrow">What the gh-pages branch holds</div>
+        <p class="muted" style="margin:6px 0 12px">Every page is one folder. Click a line to see what it is. The shape is the same for every page, so adding a page never changes the others.</p>
+        <ul class="tree" id="tree"></ul>
+      </div>
+      <aside class="pane detail" id="treeDetail" aria-live="polite"></aside>
+    </div>
+  </section>
+
+  <section class="view" id="v-why" hidden>
+    <div class="toolbar">
+      <div class="seg" id="whySeg" role="group" aria-label="Filter decisions">
+        <button data-t="all" aria-pressed="true">All</button>
+        <button data-t="simple" aria-pressed="false">Simplicity</button>
+        <button data-t="safe" aria-pressed="false">Safety</button>
+        <button data-t="robust" aria-pressed="false">Reliability</button>
+      </div>
+      <input class="search" id="whyQ" type="search" placeholder="Search decisions" aria-label="Search decisions">
+      <span class="muted" id="whyCount"></span>
+    </div>
+    <div class="cards" id="cards"></div>
+  </section>
+
+  <section class="view" id="v-limits" hidden>
+    <div class="split">
+      <div>
+        <div class="h2s" style="margin-top:0">When GitHub fails</div>
+        <p class="muted" style="margin:0 0 10px">A local save never waits for GitHub. The top bar shows the state and the message, and Retry is always there.</p>
+        <div class="tablewrap"><table id="failTbl"></table></div>
+      </div>
+      <div>
+        <div class="h2s" style="margin-top:0">Limits</div>
+        <div class="tablewrap"><table id="limTbl"></table></div>
+      </div>
+    </div>
+    <div class="h2s">Source code</div>
+    <div class="pane">
+      <p style="margin-top:0">Showcase Docs is open source (MIT). The sync lives in the <code>github</code> package: <code>GitHubSync</code> (the run), <code>StaticSite</code> (the tree), <code>GitHubClient</code> (the REST calls).</p>
+      <p style="margin-bottom:0"><a id="repoLink" href="https://github.com/TabTQ/showcase" target="_blank" rel="noopener noreferrer">github.com/TabTQ/showcase</a> <span class="muted">(if the link does not open inside this frame, copy it:</span> <code>https://github.com/TabTQ/showcase</code><span class="muted">)</span></p>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ============================ 1. EDIT THIS: the content ============================
+   Coordinates live on a virtual canvas (VIEW.w x VIEW.h); the SVG scales to the width available.
+   Nodes are NW x NH (156 x 54). Leave ~40px between nodes so edge labels fit. A node's `zone` is only a grouping label
+   for the table; zones are drawn from their own x/y/w/h. `layer` is optional: nodes/edges with a layer can be toggled. */
+const DATA = {
+  brand: "Showcase Docs",
+  eyebrow: "Architecture and design",
+  title: "Showcase Docs: architecture and design",
+  subtitle: "A self-hosted editor that publishes your pages as a static site on GitHub Pages, so the documents stay online when your own server is off. Click a box, trace a connection, or walk through a publish.",
+  view: { w: 1100, h: 560 },
+  zones: [
+    { id: "browser", label: "Your browser", x: 20, y: 40, w: 190, h: 380, tone: "" },
+    { id: "server", label: "Showcase Docs (one container)", x: 240, y: 40, w: 600, h: 380, tone: "accent" },
+    { id: "gh", label: "GitHub", x: 880, y: 40, w: 200, h: 380, tone: "info" },
+    { id: "world", label: "Visitors", x: 880, y: 440, w: 200, h: 100, tone: "" },
+  ],
+  layers: [{ id: "secret", label: "Token" }],
+  nodes: [
+    { id: "editor", zone: "browser", ico: "ED", label: "Editor", sub: "React, TipTap", x: 37, y: 200,
+      desc: "The admin interface: a page tree, a rich text editor with images and attachments, version history with restore, a trash, a preview, and the Publish dialog. It talks only to the API of its own server.",
+      facts: [["Built with", "React and TipTap"], ["Shows", "GitHub status and Retry in the top bar"], ["Reached at", "localhost, or behind your own TLS proxy"]] },
+    { id: "api", zone: "server", ico: "AP", label: "REST API", sub: "Spring Boot 3.5", x: 262, y: 200,
+      desc: "Pages, versions, uploads, publish, trash and the GitHub status. One admin with a bcrypt password, a session cookie that is HttpOnly and SameSite strict, a CSRF token on every write, a host allow-list and a login rate limit. After any change that affects the public site it only asks the sync queue to run, and returns at once.",
+      facts: [["Auth", "one admin, password hash in .env"], ["Writes", "need an X-XSRF-TOKEN header"], ["Never does", "wait for GitHub"]] },
+    { id: "db", zone: "server", ico: "DB", label: "SQLite", sub: "docs.db, WAL", x: 262, y: 90,
+      desc: "Pages, every version (save, publish, restore, move, rename), asset and bundle records, the audit log and small settings. Flyway migrates it on start. A consistent copy is made every night and the newest 14 are kept.",
+      facts: [["Mode", "WAL, foreign keys on"], ["Migrations", "Flyway, V1__init.sql"], ["Backups", "nightly, 14 kept"]] },
+    { id: "blobs", zone: "server", ico: "BL", label: "Blob store", sub: "by SHA-256", x: 262, y: 310,
+      desc: "Uploaded images, attachments and the files of uploaded HTML apps. Content addressed: a file is stored once under its SHA-256, so the same file on two pages costs nothing extra and its address never changes. Writes go to a temp file and are renamed into place.",
+      facts: [["Layout", "blobs/<aa>/<sha256>"], ["Size caps", "asset 20 MB, app bundle 25 MB (settings)"]] },
+    { id: "queue", zone: "server", ico: "SQ", label: "Sync queue", sub: "GitHubSync", x: 462, y: 200,
+      desc: "One background thread. A publish only bumps a counter and queues a run; runs that pile up are merged into one. A failed run keeps the state error with a short message and is retried by a timer (every 30 s) or by the Retry button. With GitHub off, none of this runs.",
+      facts: [["States", "idle, pending, building, live, error"], ["Threads", "exactly one, so no two pushes overlap"], ["Retry", "automatic, plus a button"]] },
+    { id: "builder", zone: "server", ico: "SB", label: "Site builder", sub: "StaticSite", x: 462, y: 90,
+      desc: "Builds the whole site as a map of path to content: a .nojekyll marker, one copy of the viewer, and for each page its folder with index.html, page.json, files and apps. A page that is no longer marked for GitHub is simply not in the result, so it disappears from the branch.",
+      facts: [["Output", "path to bytes, plus the git blob id of each"], ["Links", "become the other page's GitHub address, or plain text if not public"]] },
+    { id: "viewer", zone: "server", ico: "VW", label: "Viewer bundle", sub: "inside the jar", x: 662, y: 90,
+      desc: "One small read-only app that renders any page. It is built once, packed into the jar, and copied to viewer/ on the site. Each page folder has an index.html shell that loads it and a page.json that holds the content.",
+      facts: [["Mode", "static-data: reads page.json next to it"], ["Features", "light and dark theme, sandboxed app frames"]] },
+    { id: "client", zone: "server", ico: "GC", label: "GitHub client", sub: "REST, HttpClient", x: 662, y: 200,
+      desc: "The few calls Pages publishing needs, over plain HTTP: read a branch and its tree, create blobs, a tree and a parentless commit, move the branch, read the latest Pages build. No git binary, no clone, no working copy. Errors carry GitHub's own message, never the token.",
+      facts: [["Calls", "refs, commits, trees, blobs, pages/builds"], ["Redirects", "never followed"], ["Timeouts", "30 s per call, 3 min per upload"]] },
+    { id: "env", zone: "server", ico: "TK", label: "Token", sub: "env only", x: 662, y: 310, layer: "secret",
+      desc: "A fine-grained personal access token limited to one repository, with Contents read and write and Pages read. It is read from the environment, sent only in the Authorization header to the GitHub API, scrubbed from every log line and error, and absent from every API answer and from the published site.",
+      facts: [["Setting", "DOCS_GH_TOKEN in .env"], ["Scope", "one repository"], ["Leaves the server?", "never, except to api.github.com"]] },
+    { id: "ghapi", zone: "gh", ico: "GA", label: "GitHub REST API", sub: "api.github.com", x: 902, y: 90,
+      desc: "Receives the blobs, the tree and the commit, and moves the branch pointer. The app writes with the Git Data endpoints, not with git push.",
+      facts: [["Endpoints", "git/blobs, git/trees, git/commits, git/refs"]] },
+    { id: "branch", zone: "gh", ico: "GB", label: "gh-pages branch", sub: "one commit", x: 902, y: 200,
+      desc: "The only branch the app owns. After every publish it holds exactly one commit with no history, whose tree is the whole site. The app never touches other branches. If it finds files here but no .nojekyll at the root, it treats the branch as someone else's and refuses to overwrite it.",
+      facts: [["History", "none (kept in the editor instead)"], ["Marker", ".nojekyll at the root"]] },
+    { id: "pages", zone: "gh", ico: "GP", label: "GitHub Pages", sub: "static hosting", x: 902, y: 310,
+      desc: "Builds the branch after each commit and serves it as plain files at https://<user>.github.io/<repo>/<folder>/. It usually takes about a minute. Because .nojekyll is present, files are served exactly as they are.",
+      facts: [["Cost", "free for public repositories"], ["Runs on", "GitHub's servers, so it works while your server is off"]] },
+    { id: "reader", zone: "world", ico: "RD", label: "Reader", sub: "any browser", x: 902, y: 470,
+      desc: "Opens a page URL. The shell loads the shared viewer, the viewer reads page.json next to it and renders the page. No server of yours is involved.",
+      facts: [["Needs", "nothing from the editor machine"], ["Indexing", "pages are marked noindex"]] },
+  ],
+  edges: [
+    { from: "editor", to: "api", label: "HTTPS" },
+    { from: "api", to: "db", label: "SQL" },
+    { from: "api", to: "blobs", label: "files" },
+    { from: "api", to: "queue", label: "sync", style: "dashed" },
+    { from: "queue", to: "builder", label: "build()" },
+    { from: "builder", to: "db", label: "reads" },
+    { from: "builder", to: "blobs", via: [[440, 117], [440, 337]] },
+    { from: "viewer", to: "builder", label: "viewer" },
+    { from: "queue", to: "client", label: "push" },
+    { from: "env", to: "client", label: "Bearer", layer: "secret" },
+    { from: "client", to: "ghapi", label: "REST" },
+    { from: "ghapi", to: "branch", label: "move" },
+    { from: "branch", to: "pages", label: "build", style: "dashed" },
+    { from: "pages", to: "reader", label: "HTTPS", via: [[980, 400], [980, 460]] },
+  ],
+  flows: [
+    { name: "Publish a page", steps: [
+      [0, "You press Publish in the editor. The request carries the session cookie and the CSRF header."],
+      [1, "The API stores the new public version and its folder name in SQLite."],
+      [3, "It queues a sync and answers at once. The editor shows 'Waiting to send to GitHub'."],
+      [4, "The sync thread asks the site builder for the whole tree."],
+      [8, "The files and their git blob ids go to the GitHub client."],
+      [10, "The client compares with the branch, uploads only new blobs, and sends one parentless commit."],
+      [11, "The gh-pages pointer is moved to that commit."],
+      [12, "GitHub Pages builds the branch. The client polls until it reports built, then the status is live."] ] },
+    { name: "A visitor opens a page", steps: [
+      [13, "The reader's browser asks GitHub Pages for the page's folder. Your server is not involved."] ] },
+    { name: "Upload an app or image", steps: [
+      [0, "The editor sends the file as multipart."],
+      [2, "The API hashes it and stores it in the blob store under its SHA-256."],
+      [1, "The version record in SQLite points at that hash."] ] },
+  ],
+};
+/* ============================ 2. ENGINE (usually leave as is) ============================ */
+const NW = 156, NH = 54, $ = (s, r = document) => r.querySelector(s);
+const byId = Object.fromEntries(DATA.nodes.map((n) => [n.id, n]));
+const svg = $("#svg"), NS = "http://www.w3.org/2000/svg";
+const state = { sel: null, hidden: new Set(), q: "", flow: 0, step: -1, timer: null };
+function mk(tag, attrs, parent, text) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; if (parent) parent.appendChild(e); return e; }
+function h(tag, attrs, ...kids) { const e = document.createElement(tag); for (const k in (attrs || {})) { if (k === "class") e.className = attrs[k]; else if (k.startsWith("on")) e[k] = attrs[k]; else e.setAttribute(k, attrs[k]); } for (const c of kids.flat()) if (c != null) e.append(c.nodeType ? c : document.createTextNode(c)); return e; }
+
+function edgeGeom(e) {
+  const a = byId[e.from], b = byId[e.to];
+  const edge = (n, tx, ty) => { // point where the line from the node centre toward (tx,ty) leaves the box
+    const px = n.x + NW / 2, py = n.y + NH / 2, vx = tx - px, vy = ty - py;
+    const t = Math.min((NW / 2 + 3) / (Math.abs(vx) || 1e-6), (NH / 2 + 3) / (Math.abs(vy) || 1e-6));
+    return [px + vx * t, py + vy * t];
+  };
+  const ax = a.x + NW / 2, ay = a.y + NH / 2, bx = b.x + NW / 2, by = b.y + NH / 2;
+  if (e.via && e.via.length) { // waypoints [[x,y],...]: route around nodes instead of cutting across them
+    const first = e.via[0], last = e.via[e.via.length - 1];
+    const [x1, y1] = edge(a, first[0], first[1]), [x2, y2] = edge(b, last[0], last[1]);
+    const pts = [[x1, y1], ...e.via, [x2, y2]];
+    let best = 0, bl = -1; for (let i = 0; i < pts.length - 1; i++) { const l = Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]); if (l > bl) { bl = l; best = i; } }
+    return { d: "M" + pts.map((p) => p.join(",")).join(" L"), lx: (pts[best][0] + pts[best + 1][0]) / 2, ly: (pts[best][1] + pts[best + 1][1]) / 2 - 5 };
+  }
+  const reverse = DATA.edges.some((o) => o.from === e.to && o.to === e.from);
+  const bend = e.bend ?? (reverse ? 16 : 0);
+  const dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy) || 1;
+  const cx = (ax + bx) / 2 + (-dy / len) * bend * 2, cy = (ay + by) / 2 + (dx / len) * bend * 2;
+  const [x1, y1] = edge(a, cx, cy), [x2, y2] = edge(b, cx, cy);
+  const d = bend ? `M${x1},${y1} Q${cx},${cy} ${x2},${y2}` : `M${x1},${y1} L${x2},${y2}`;
+  const lx = bend ? 0.25 * x1 + 0.5 * cx + 0.25 * x2 : (x1 + x2) / 2, ly = (bend ? 0.25 * y1 + 0.5 * cy + 0.25 * y2 : (y1 + y2) / 2) - 5;
+  return { d, lx, ly };
+}
+
+function draw() {
+  svg.replaceChildren();
+  svg.setAttribute("viewBox", `0 0 ${DATA.view.w} ${DATA.view.h}`);
+  svg.style.setProperty("--minw", Math.min(DATA.view.w, 1100) * 0.9 + "px"); // phones scroll the diagram inside its frame instead of shrinking the text
+  const defs = mk("defs", {}, svg);
+  for (const [id, cls] of [["ar", "arrow"], ["arh", "arrow hi"]]) {
+    const m = mk("marker", { id, viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 8, markerHeight: 8, orient: "auto-start-reverse" }, defs);
+    mk("path", { d: "M0,0 L10,5 L0,10 z", class: cls, style: `fill:var(${id === "ar" ? "--muted" : "--accent"})` }, m);
+  }
+  for (const z of DATA.zones) {
+    const g = mk("g", { class: "zone" + (z.tone ? " t-" + z.tone : "") }, svg);
+    mk("rect", { x: z.x, y: z.y, width: z.w, height: z.h, rx: 6 }, g);
+    mk("text", { x: z.x + 12, y: z.y + 20 }, g, z.label);
+  }
+  const edgeEls = DATA.edges.map((e, i) => {
+    const g = mk("g", { class: "edge" + (e.style === "dashed" ? " dashed" : ""), "data-i": i }, svg);
+    const gm = edgeGeom(e);
+    const p = mk("path", { d: gm.d, "marker-end": "url(#ar)" }, g);
+    if (e.both) p.setAttribute("marker-start", "url(#ar)");
+    if (e.label) mk("text", { x: gm.lx, y: gm.ly }, g, e.label);
+    return g;
+  });
+  const nodeEls = DATA.nodes.map((n) => {
+    const g = mk("g", { class: "node", tabindex: 0, role: "button", "data-id": n.id, "aria-label": `${n.label}: ${n.sub || ""}` }, svg);
+    mk("rect", { class: "box", x: n.x, y: n.y, width: NW, height: NH, rx: 5 }, g);
+    mk("rect", { class: "ico", x: n.x + 9, y: n.y + 12, width: 30, height: 30, rx: 4 }, g);
+    mk("text", { class: "i", x: n.x + 24, y: n.y + 31 }, g, n.ico || n.label.slice(0, 2).toUpperCase());
+    mk("text", { class: "n", x: n.x + 48, y: n.y + 24 }, g, n.label);
+    mk("text", { class: "s", x: n.x + 48, y: n.y + 40 }, g, n.sub || "");
+    g.addEventListener("click", (ev) => { ev.stopPropagation(); select(n.id); });
+    g.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); select(n.id); } });
+    g.addEventListener("mouseenter", () => focusOn(n.id)); g.addEventListener("mouseleave", () => focusOn(state.sel));
+    g.addEventListener("focus", () => focusOn(n.id)); g.addEventListener("blur", () => focusOn(state.sel));
+    return g;
+  });
+  svg.addEventListener("click", () => select(null));
+  draw.edgeEls = edgeEls; draw.nodeEls = nodeEls;
+  applyVisibility();
+}
+
+function visibleNode(n) { return (!n.layer || !state.hidden.has(n.layer)) && (!state.q || (n.label + " " + (n.sub || "") + " " + (n.desc || "")).toLowerCase().includes(state.q)); }
+function applyVisibility() {
+  DATA.nodes.forEach((n, i) => { const on = visibleNode(n) || (state.q && false); draw.nodeEls[i].style.display = (!n.layer || !state.hidden.has(n.layer)) ? "" : "none"; draw.nodeEls[i].style.opacity = on ? "" : ".25"; });
+  DATA.edges.forEach((e, i) => { const hide = (e.layer && state.hidden.has(e.layer)) || (byId[e.from].layer && state.hidden.has(byId[e.from].layer)) || (byId[e.to].layer && state.hidden.has(byId[e.to].layer)); draw.edgeEls[i].style.display = hide ? "none" : ""; });
+}
+function focusOn(id) {
+  const rel = new Set(id ? [id] : []);
+  DATA.edges.forEach((e, i) => { const hit = id && (e.from === id || e.to === id); const el = draw.edgeEls[i]; el.classList.toggle("hi", !!hit); el.querySelector("path").setAttribute("marker-end", hit ? "url(#arh)" : "url(#ar)"); if (hit) { rel.add(e.from); rel.add(e.to); } });
+  DATA.nodes.forEach((n, i) => draw.nodeEls[i].classList.toggle("rel", rel.has(n.id)));
+  svg.classList.toggle("focus", !!id);
+}
+function select(id) {
+  state.sel = id; stopFlow();
+  DATA.nodes.forEach((n, i) => draw.nodeEls[i].classList.toggle("sel", n.id === id));
+  focusOn(id); renderDetail();
+}
+function renderDetail() {
+  const box = $("#detail"), n = byId[state.sel];
+  if (!n) { box.replaceChildren(h("div", { class: "eyebrow" }, "Details"), h("h2", {}, DATA.title), h("p", { class: "muted" }, "Select a component to see what it does, its settings and what it talks to."),
+    h("div", { class: "tiles" }, h("div", { class: "tile" }, h("div", { class: "k" }, "Components"), h("div", { class: "v" }, DATA.nodes.length)), h("div", { class: "tile" }, h("div", { class: "k" }, "Connections"), h("div", { class: "v" }, DATA.edges.length)))); return; }
+  const out = DATA.edges.filter((e) => e.from === n.id), inc = DATA.edges.filter((e) => e.to === n.id);
+  const link = (otherId, e) => h("li", {}, h("button", { onclick: () => select(otherId) }, h("span", { class: "lbl" }, e.label || ""), byId[otherId].label));
+  box.replaceChildren(...[
+    h("div", { class: "eyebrow" }, (DATA.zones.find((z) => z.id === n.zone) || {}).label || "Component"),
+    h("h2", {}, n.label), n.sub ? h("div", { class: "mono muted", style: "font-size:12.5px" }, n.sub) : null,
+    h("p", {}, n.desc || ""),
+    n.facts && n.facts.length ? h("dl", {}, n.facts.flatMap(([k, v]) => [h("dt", {}, k), h("dd", {}, v)])) : null,
+    out.length ? h("div", {}, h("div", { class: "eyebrow" }, "Talks to"), h("ul", { class: "links" }, out.map((e) => link(e.to, e)))) : null,
+    inc.length ? h("div", { style: "margin-top:12px" }, h("div", { class: "eyebrow" }, "Called by"), h("ul", { class: "links" }, inc.map((e) => link(e.from, e)))) : null].filter(Boolean));
+}
+
+/* walk-through */
+function stopFlow() { clearInterval(state.timer); state.timer = null; $("#play").textContent = "▶ Play"; }
+function showStep() {
+  const f = DATA.flows[state.flow]; if (!f) return;
+  draw.edgeEls.forEach((el) => el.classList.remove("step"));
+  if (state.step < 0) { $("#stepcap").textContent = f.steps.length + " steps. Press Play or use ◀ ▶|."; return; }
+  const [ei, text] = f.steps[state.step];
+  draw.edgeEls[ei].classList.add("step");
+  $("#stepcap").textContent = `Step ${state.step + 1} of ${f.steps.length}: ${text}`;
+  const e = DATA.edges[ei]; state.sel = null; focusOn(null); svg.classList.add("focus");
+  DATA.nodes.forEach((n, i) => draw.nodeEls[i].classList.toggle("rel", n.id === e.from || n.id === e.to));
+}
+function stepBy(d) { const f = DATA.flows[state.flow]; if (!f) return; state.step = Math.min(f.steps.length - 1, Math.max(-1, state.step + d)); showStep(); }
+function play() {
+  if (state.timer) { stopFlow(); return; }
+  const f = DATA.flows[state.flow]; if (!f) return;
+  state.step = -1; $("#play").textContent = "❚❚ Pause";
+  const tick = () => { if (state.step >= f.steps.length - 1) { stopFlow(); return; } stepBy(1); };
+  tick(); state.timer = setInterval(tick, 1800);
+}
+
+/* table view */
+function drawTable() {
+  const t = $("#tbl"); t.replaceChildren(h("thead", {}, h("tr", {}, ["Component", "Where", "What it does", "Talks to"].map((c) => h("th", {}, c)))),
+    h("tbody", {}, DATA.nodes.map((n) => h("tr", {}, h("td", {}, h("b", {}, n.label), n.sub ? h("div", { class: "mono muted", style: "font-size:12px" }, n.sub) : null),
+      h("td", {}, (DATA.zones.find((z) => z.id === n.zone) || {}).label || ""), h("td", {}, n.desc || ""),
+      h("td", {}, DATA.edges.filter((e) => e.from === n.id).map((e) => byId[e.to].label).join(", ") || "-")))));
+  $("#count").textContent = DATA.nodes.length + " components, " + DATA.edges.length + " connections";
+}
+
+
+/* ---- extra views ---- */
+const STEPS = [
+  { t: "Draft", s: "Saving never touches the public page", body: "Every save makes a version in SQLite, and the public page does not change. You can edit, restore an old version or preview as much as you like. Only Publish moves a version to the public site.", code: "save   -> version 12 (draft)\npublic -> still version 11" },
+  { t: "Publish", s: "A new public version, then a queued run", body: "Publish marks the draft as the public version and stores the folder name you chose. The API then calls requestSync(), which bumps a counter, sets the state to pending and returns at once. Nothing here can fail because of GitHub.", code: "state: pending\n'Waiting to send to GitHub.'" },
+  { t: "Build the whole tree", s: "Everything public, every time", body: "The sync thread asks the site builder for the complete site: a .nojekyll marker, the viewer once, and for each public page its folder. Each file gets its git blob id (SHA-1 of \"blob <size>\\0\" + content), which GitHub computes the same way, so both sides can compare ids instead of bytes.", code: "site = { '.nojekyll', 'viewer/assets/...',\n         'notes/index.html', 'notes/page.json', ... }\nshas = path -> gitBlobSha" },
+  { t: "Compare with the branch", s: "Read the branch, check it is ours", body: "One call reads the branch ref, its commit and its full tree. Two things can stop the run here. If the branch has files but no .nojekyll at the root, it is someone else's and is left alone. If its files already equal the new tree exactly, the run ends as 'Up to date' with no commit at all.", code: "GET git/ref/heads/gh-pages\nGET git/commits/<sha>\nGET git/trees/<tree>?recursive=1" },
+  { t: "Upload only new blobs", s: "Blobs the branch already has are skipped", body: "For each file whose blob id is not in the branch's tree, and is not already uploaded in this run, the client creates a blob (base64, streamed, so a large file is never held twice). After each upload the returned id must equal the one computed locally, otherwise the run stops.", code: "POST git/blobs   (only the new ones)\nsha(returned) == sha(local)  else abort" },
+  { t: "One parentless commit", s: "A complete tree and no history", body: "The client creates a tree listing every file (mode 100644, no base tree, so a file that is gone is gone) and a commit that points at it with an empty parents list. The branch therefore never accumulates history.", code: "POST git/trees   { tree: [all files] }\nPOST git/commits { tree, parents: [] }" },
+  { t: "Move the branch", s: "Create it, or force-move it", body: "If the branch does not exist yet it is created. If it exists, its pointer is moved to the new commit with force. A 422 on create (the branch appeared in between) falls back to the move. The old commit simply becomes unreachable.", code: "POST  git/refs               (first time)\nPATCH git/refs/heads/gh-pages { force: true }" },
+  { t: "Pages build, then live", s: "Poll until GitHub says built", body: "The state becomes building. The client asks for the latest Pages build every 3 seconds, for up to 2 minutes, and matches it to the new commit. Built means live. Errored means error, with GitHub's message. If the token cannot read Pages (403 or 404) or the time runs out, the files are already sent, so the state is live with a note that it may need a minute.", code: "GET pages/builds/latest  -> built | errored\nstate: live  'Sent 49 files. The site is live.'" },
+];
+const SIMFILES = [
+  { f: ".nojekyll", note: "empty marker" },
+  { f: "viewer/assets/index-<hash>.js", note: "shared viewer" },
+  { f: "viewer/assets/index-<hash>.css", note: "shared viewer" },
+  { f: "notes/index.html", note: "shell", chg: 1 },
+  { f: "notes/page.json", note: "content", chg: 1 },
+  { f: "notes/app/<bundle>/index.html", note: "uploaded app" },
+  { f: "notes/app/<bundle>/_embed/theme.js", note: "theme script" },
+  { f: "guide/index.html", note: "shell" },
+  { f: "guide/page.json", note: "content" },
+  { f: "guide/a/<sha>.png", note: "image" },
+];
+const SIMS = {
+  first: { s: "10 files in the tree, all new: 10 uploaded, 1 commit", note: "The first run has an empty or missing branch, so every distinct file is uploaded once. The viewer is uploaded once however many pages there are.", up: (x) => true, commit: true },
+  edit: { s: "10 files in the tree, 2 uploaded, 8 reused, 1 commit", note: "Only the edited page's shell and page.json differ. The other pages and the viewer keep their blob ids, so GitHub already has them. The commit still lists all 10 files.", up: (x) => !!x.chg, commit: true },
+  same: { s: "10 files in the tree, 0 uploaded, no commit", note: "The built tree equals the branch, so the run ends as 'Up to date' and goes straight to checking the Pages build. Retry and republish are therefore cheap.", up: (x) => false, commit: false },
+};
+const TREE = [
+  { id: "root", name: "gh-pages (branch root)", kind: "one commit", kids: [
+    { id: "nojekyll", name: ".nojekyll", kind: "marker", d: "An empty file. It makes GitHub Pages serve files as they are, and it is how the app recognises a branch it wrote itself. A branch that has files but no .nojekyll is never overwritten." },
+    { id: "viewer", name: "viewer/", kind: "shared", d: "One copy of the read-only viewer for the whole site: viewer/assets with its JavaScript and CSS. Every page shell points at it with a relative path, so an update of the viewer is one change, not one per page.", kids: [
+      { id: "vassets", name: "assets/index-<hash>.js, .css", kind: "files", d: "Fingerprinted names, so browsers cache them safely and a new viewer build has new names." } ] },
+    { id: "page", name: "<folder>/", kind: "one page", d: "One folder per published page. The folder name is chosen in the Publish dialog: lower-case letters, digits and hyphens, at most 63 characters, unique, and not one of the names the site itself uses (viewer, assets, a, app, api, static, index). It is the page's public address: https://<user>.github.io/<repo>/<folder>/.", kids: [
+      { id: "pindex", name: "index.html", kind: "shell", d: "The viewer's own index.html, made for this page: asset paths rewritten to ../viewer/assets/, the page title, a robots noindex tag, and a static-data tag that names page.json. Nothing else differs between pages." },
+      { id: "pjson", name: "page.json", kind: "content", d: "The whole published page as data: title, settings, the rich document, the list of its files with their paths, and its apps. Links to other pages are already real GitHub addresses, or plain text if that page is not public." },
+      { id: "pa", name: "a/<sha>.<ext>", kind: "files", d: "Images and attachments the page lists. The name is the file's SHA-256, so a changed image has a new address and old caches never show a stale one." },
+      { id: "papp", name: "app/<bundle-sha>/...", kind: "app", d: "An uploaded HTML app, with all its files, plus _embed/theme.js, which passes the reader's light or dark choice into the sandboxed frame. Apps embedded in a rich page are here too.", kids: [] } ] },
+  ] },
+];
+const DECISIONS = [
+  { t: "robust", h: "One branch, replaced each time, no history", w: "The site is always exactly 'everything public right now'. A page that is unpublished or renamed just stops being in the tree. There is no merge, no conflict and no growth of the repository.", c: "You cannot go back through the branch. History lives in the editor, in each page's version list." },
+  { t: "simple", h: "The REST API instead of a git binary", w: "A few HTTPS calls replace a clone, a working copy, credentials on disk and a git install in the image. The container stays small and runs with a read-only file system. Large files stream as base64 and are never held twice.", c: "More code that speaks GitHub's protocol. It is small (about 280 lines) and tested against a fake GitHub." },
+  { t: "simple", h: "One viewer for every page", w: "The viewer is built once and copied once to viewer/. Pages are data (page.json) plus a tiny shell. An upgrade of the look is one set of files, and a page can never carry its own broken copy of the renderer.", c: "Every page looks like a Showcase Docs page. Custom looks go into an uploaded HTML app." },
+  { t: "simple", h: "Static-data mode", w: "Normally the viewer asks an API for the page. On GitHub there is no API, so the shell has a static-data tag that names page.json and the viewer reads that file. The same viewer code serves both worlds, and the public site needs no server at all.", c: "The viewer is read-only on Pages: no search across pages, no tree, no comments." },
+  { t: "safe", h: "A branch without .nojekyll is never overwritten", w: "Replacing the whole branch is dangerous if the branch holds someone's source code. The app only overwrites a branch that is empty or carries its own .nojekyll marker. Otherwise it stops with an error that tells you to use a new branch.", c: "You must point it at an empty or new branch, not at main." },
+  { t: "safe", h: "The token never leaves the server", w: "It comes from the environment, goes only to the GitHub API in an Authorization header, is scrubbed from log lines and error messages, and is absent from every API answer and from the published site. It is limited to one repository with Contents write and Pages read.", c: "Whoever controls the server controls the token, so the editor port is private by default (localhost only)." },
+  { t: "robust", h: "Failure handling with status and retry", w: "A publish saves locally first and queues the GitHub work. If GitHub is down or the token is wrong the change is safe, the top bar shows the state and message, a timer retries every 30 seconds, and a Retry button does it now. Runs that pile up are merged.", c: "The public site can lag behind the editor until GitHub is reachable again." },
+  { t: "robust", h: "Upload only new blobs, compare by git blob id", w: "Both sides compute the same id for the same bytes, so the app can tell what GitHub already has without downloading anything, and can end a run with 'Up to date' when nothing changed. Uploads are verified against the returned id.", c: "The tree call lists every file each time, so it grows with the size of the site." },
+  { t: "safe", h: "Only Publish changes the public page", w: "Saving a draft, restoring a version or editing in the trash never reaches GitHub. Publishing is a deliberate step with pre-publish checks in the dialog, which matters because everything on the branch is world readable.", c: "One extra click per release." },
+  { t: "safe", h: "Uploaded apps run in a sandbox", w: "An HTML app is shown in a sandboxed frame with a strict content security policy, and the theme script is the only thing added. Only upload apps you trust, because on Pages they run on the public site.", c: "Apps cannot use storage, cookies or pop-ups." },
+];
+const FAILS = [
+  ["401", "The token is wrong, expired or revoked.", "State error. Make a new token, set it, press Retry."],
+  ["403", "The token lacks a permission, or GitHub is rate limiting.", "State error. Fix the token's permissions, then Retry. Auto-retry keeps trying."],
+  ["404", "The repository name is wrong or the token cannot see it.", "State error with the message. Check the name and the token's repository list."],
+  ["409", "The repository is empty.", "Make a first commit (a README), then Retry."],
+  ["Other files on the branch", "No .nojekyll at the root: not our branch.", "Stops and does not retry. Use an empty or new branch."],
+  ["Pages build errored", "GitHub could not build the site.", "State error with GitHub's message. Fix and republish."],
+  ["GitHub not reachable", "Network or outage.", "Change stays saved. Timer retries every 30 s."],
+];
+const LIMITS = [
+  ["Public only", "Every published page is world readable. There is no private or password-protected publishing."],
+  ["About a minute", "A change shows on the site after GitHub Pages has built the new commit."],
+  ["Site size", "A Pages site is limited to 1 GB. Keep the repository small (GitHub advises under 1 GB)."],
+  ["File size", "A file must be under 100 MB. The app caps an image or attachment at 20 MB and an uploaded app at 25 MB by default."],
+  ["Whole-site rebuild", "The tree is rebuilt on every publish, so many large files make each run slower (unchanged files are not re-uploaded)."],
+  ["One admin", "One password, no accounts, no roles."],
+  ["Private editor", "No HTTPS of its own. Keep it on localhost, or behind a TLS proxy or private network."],
+];
+
+function initExtra() {
+  const sl = $("#steplist"), sd = $("#stepdetail"); let cur = 0;
+  function showStepDetail(i) {
+    cur = i; const st = STEPS[i];
+    sl.querySelectorAll("button").forEach((b, j) => b.setAttribute("aria-current", j === i));
+    sd.replaceChildren(h("div", { class: "eyebrow" }, "Step " + (i + 1) + " of " + STEPS.length), h("h2", {}, st.t), h("div", { class: "mono muted", style: "font-size:12.5px" }, st.s), h("p", {}, st.body),
+      h("div", { class: "codeblock" }, h("pre", {}, st.code)),
+      h("div", { class: "toolbar" }, h("button", { class: "btn sm", onclick: () => showStepDetail(Math.max(0, i - 1)), "aria-label": "Previous step" }, "Back"), h("button", { class: "btn sm pri", onclick: () => showStepDetail(Math.min(STEPS.length - 1, i + 1)), "aria-label": "Next step" }, "Next")));
+    reportHeight();
+  }
+  sl.replaceChildren(...STEPS.map((st, i) => h("li", {}, h("button", { onclick: () => showStepDetail(i) }, h("span", { class: "num" }, i + 1), h("span", {}, h("b", {}, st.t), h("span", { class: "muted", style: "display:block;font-size:12.5px" }, st.s))))));
+  showStepDetail(0);
+
+  function showSim(k) {
+    const sim = SIMS[k];
+    $("#simSeg").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.s === k));
+    $("#simSummary").textContent = sim.s; $("#simNote").textContent = sim.note;
+    const first = k === "first";
+    $("#simFiles").replaceChildren(...SIMFILES.map((x) => {
+      const up = sim.up(x);
+      return h("div", { class: "filerow" }, h("span", { class: "pill " + (up ? "acc" : "") }, up ? "upload" : "reuse"), h("code", {}, x.f), h("span", { class: "muted" }, x.note));
+    }), h("div", { class: "filerow" }, h("span", { class: "pill " + (sim.commit ? "ok" : "warn") }, sim.commit ? "commit" : "no commit"), h("code", {}, sim.commit ? "tree with every file, parents: []" : "tree equals the branch: Up to date"), h("span", { class: "muted" }, sim.commit ? "branch moves" : "branch stays")));
+    reportHeight();
+  }
+  $("#simSeg").querySelectorAll("button").forEach((b) => b.onclick = () => showSim(b.dataset.s));
+  showSim("first");
+
+  const tul = $("#tree"), td = $("#treeDetail"); let tsel = "page";
+  const flat = []; (function walk(ns) { ns.forEach((n) => { flat.push(n); if (n.kids) walk(n.kids); }); })(TREE);
+  function treeDetail(id) {
+    tsel = id; const n = flat.find((x) => x.id === id);
+    tul.querySelectorAll("button").forEach((b) => b.setAttribute("aria-current", b.dataset.id === id));
+    td.replaceChildren(h("div", { class: "eyebrow" }, n.kind), h("h2", { class: "mono", style: "font-size:1.05rem;overflow-wrap:anywhere" }, n.name),
+      h("p", {}, n.d || "The branch has exactly one commit and no parent. Its tree is the whole site, rebuilt from the database on every publish. Pick a line to see what it is."));
+    reportHeight();
+  }
+  function renderNode(n) { return h("li", {}, h("button", { "data-id": n.id, onclick: () => treeDetail(n.id) }, h("span", {}, n.name), h("span", { class: "k" }, n.kind)), n.kids && n.kids.length ? h("ul", {}, n.kids.map(renderNode)) : null); }
+  tul.replaceChildren(...TREE.map(renderNode)); treeDetail("page");
+
+  const cards = $("#cards"); let tf = "all", q = "";
+  const names = { simple: "Simplicity", safe: "Safety", robust: "Reliability" };
+  cards.replaceChildren(...DECISIONS.map((d) => h("article", { class: "card", "data-t": d.t, "data-q": (d.h + " " + d.w + " " + d.c).toLowerCase() },
+    h("span", { class: "pill " + (d.t === "safe" ? "warn" : d.t === "robust" ? "info" : "acc") }, names[d.t]), h("h3", {}, d.h),
+    h("p", { class: "why" }, h("b", {}, "Why. "), d.w), h("p", { class: "cost" }, h("b", {}, "Trade-off. "), d.c))));
+  function filterCards() { let n = 0; cards.querySelectorAll(".card").forEach((c) => { const on = (tf === "all" || c.dataset.t === tf) && (!q || c.dataset.q.includes(q)); c.hidden = !on; if (on) n++; }); $("#whyCount").textContent = n + " of " + DECISIONS.length; reportHeight(); }
+  $("#whySeg").querySelectorAll("button").forEach((b) => b.onclick = () => { tf = b.dataset.t; $("#whySeg").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", x === b)); filterCards(); });
+  $("#whyQ").oninput = (e) => { q = e.target.value.trim().toLowerCase(); filterCards(); };
+  filterCards();
+
+  $("#failTbl").replaceChildren(h("thead", {}, h("tr", {}, ["Message", "Cause", "What happens"].map((c) => h("th", {}, c)))), h("tbody", {}, FAILS.map((r) => h("tr", {}, h("td", {}, h("b", {}, r[0])), h("td", {}, r[1]), h("td", {}, r[2])))));
+  $("#limTbl").replaceChildren(h("thead", {}, h("tr", {}, ["Limit", "Detail"].map((c) => h("th", {}, c)))), h("tbody", {}, LIMITS.map((r) => h("tr", {}, h("td", {}, h("b", {}, r[0])), h("td", {}, r[1])))));
+}
+
+/* tabs, layers, search, theme, height reporting */
+const VIEWS = [["diagram", "Architecture"], ["flow", "Publish flow"], ["tree", "Site tree"], ["why", "Design decisions"], ["limits", "Failures and limits"], ["table", "Components"]];
+function showView(id) { for (const [v] of VIEWS) $("#v-" + v).hidden = v !== id; document.querySelectorAll("#nav button").forEach((b) => b.setAttribute("aria-selected", b.dataset.v === id)); reportHeight(); }
+function setup() {
+  document.title = DATA.title; $("#brand").textContent = DATA.brand; $("#eyebrow").textContent = DATA.eyebrow; $("#title").textContent = DATA.title; $("#subtitle").textContent = DATA.subtitle;
+  $("#nav").replaceChildren(...VIEWS.map(([v, l]) => h("button", { role: "tab", "data-v": v, onclick: () => showView(v) }, l)));
+  $("#layers").replaceChildren(...DATA.layers.map((l) => h("button", { "aria-pressed": "true", onclick: (ev) => { const b = ev.currentTarget, on = b.getAttribute("aria-pressed") !== "true"; b.setAttribute("aria-pressed", on); on ? state.hidden.delete(l.id) : state.hidden.add(l.id); applyVisibility(); } }, l.label)));
+  if (!DATA.layers.length) $("#layers").remove();
+  $("#flowSel").replaceChildren(...DATA.flows.map((f, i) => h("option", { value: i }, f.name)));
+  if (!DATA.flows.length) ["#flowSel", "#prev", "#play", "#next", "label[for=flowSel]"].forEach((s) => $(s).remove());
+  $("#flowSel").onchange = (e) => { stopFlow(); state.flow = +e.target.value; state.step = -1; showStep(); };
+  $("#prev").onclick = () => { stopFlow(); stepBy(-1); }; $("#next").onclick = () => { stopFlow(); stepBy(1); }; $("#play").onclick = play;
+  $("#q").oninput = (e) => { state.q = e.target.value.trim().toLowerCase(); applyVisibility(); };
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { stopFlow(); state.step = -1; select(null); showStep(); } });
+  draw(); drawTable(); initExtra(); renderDetail(); showStep(); showView("diagram");
+}
+
+/* Theme + height protocol used when this page is shown inside a Docs page (a sandboxed iframe). Works standalone too. */
+const root = document.documentElement; let themeMode = 0; // 0 system, 1 light, 2 dark
+function applyTheme(t) { t ? root.setAttribute("data-theme", t) : root.removeAttribute("data-theme"); $("#themeBtn").textContent = "Theme: " + (themeMode === 0 ? "system" : themeMode === 1 ? "light" : "dark"); }
+const fromUrl = new URLSearchParams(location.search).get("theme");
+if (fromUrl === "dark" || fromUrl === "light") { themeMode = fromUrl === "dark" ? 2 : 1; }
+addEventListener("message", (e) => { if (e.source === parent && e.data && e.data.type === "hub:theme") { themeMode = e.data.theme === "dark" ? 2 : 1; applyTheme(e.data.theme); } });
+$("#themeBtn").onclick = () => { themeMode = (themeMode + 1) % 3; applyTheme(themeMode === 0 ? null : themeMode === 1 ? "light" : "dark"); };
+function reportHeight() { try { parent.postMessage({ type: "hub:height", px: Math.ceil(Math.max(root.scrollHeight, document.body.scrollHeight)) }, "*"); } catch (_) {} }
+if (window.ResizeObserver) new ResizeObserver(reportHeight).observe(root);
+addEventListener("load", reportHeight);
+
+setup(); applyTheme(themeMode === 0 ? null : themeMode === 1 ? "light" : "dark");
+</script>
+</body>
+</html>

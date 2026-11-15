@@ -1,0 +1,979 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Proxmox Compute and Backup Node</title>
+<style>
+/* Homelab Hub "Signal" tokens, copied from docs/mockups. Light is the base; dark overrides below (system, then explicit). */
+:root {
+  --bg: #e7e1d5; --surface: #f2eee5; --surface2: #e0d9cb; --ink: #191c1b; --muted: #5a605d; --line: #c2baa9;
+  --accent: #067f72; --accent-ink: #f4f1ea; --accent-soft: #d3e4dc;
+  --ok: #2f7a36; --warn: #9a6408; --bad: #a8322a; --info: #23688f;
+  --ok-soft: #dbe8d3; --warn-soft: #f0e2c2; --bad-soft: #f0d6cf; --info-soft: #d5e2e6;
+  --code-bg: #0a181c; --code-ink: #dfe7e4;
+  --shadow: none;
+  --radius: 0px; --radius-lg: 0px;
+  --f-display: "Cormorant Garamond", "Palatino Linotype", Palatino, "Book Antiqua", "P052", Georgia, serif;
+  --f-body: "Barlow", "DIN Alternate", Bahnschrift, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: light; --ember: #b4531a; --gold: #8a6a2a;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #061215; --surface: #0a181c; --surface2: #10262b; --ink: #dfe7e4; --muted: #8b9b98; --line: #1c383e;
+    --accent: #40c1ac; --accent-ink: #03110f; --accent-soft: #0d2c2b; --ok: #9ad17a; --warn: #e5b04a; --bad: #e0564a; --info: #6ab8e6;
+    --ok-soft: #17291a; --warn-soft: #2e2613; --bad-soft: #321715; --info-soft: #12283a; --code-bg: #020607; --code-ink: #dfe7e4;
+    --shadow: none; color-scheme: dark; --ember: #e0752a; --gold: #c9a45c;
+}
+}
+:root[data-theme="dark"] {
+  --bg: #061215; --surface: #0a181c; --surface2: #10262b; --ink: #dfe7e4; --muted: #8b9b98; --line: #1c383e;
+  --accent: #40c1ac; --accent-ink: #03110f; --accent-soft: #0d2c2b; --ok: #9ad17a; --warn: #e5b04a; --bad: #e0564a; --info: #6ab8e6;
+  --ok-soft: #17291a; --warn-soft: #2e2613; --bad-soft: #321715; --info-soft: #12283a; --code-bg: #020607; --code-ink: #dfe7e4;
+  --shadow: none; color-scheme: dark; --ember: #e0752a; --gold: #c9a45c;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 var(--f-body); }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+a { color: var(--accent); }
+h1, h2, h3 { font-family: var(--f-display); line-height: 1.2; margin: 0; }
+.mono { font-family: var(--f-mono); }
+.muted { color: var(--muted); }
+.grow { flex: 1; }
+.eyebrow { font: 500 11px var(--f-mono); text-transform: uppercase; letter-spacing: .09em; color: var(--muted); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* ---- top bar + tabs ---- */
+.bar { position: sticky; top: 0; z-index: 20; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 10px 16px; background: var(--bg); border-bottom: 1px solid var(--line); }
+.brand { font: 700 15px var(--f-display); display: flex; gap: 8px; align-items: center; margin-right: 10px; }
+.brand i { width: 12px; height: 12px; background: var(--accent); display: inline-block; border-radius: var(--radius); }
+.nav { display: flex; gap: 2px; flex-wrap: wrap; }
+.nav button { background: none; border: 0; padding: 6px 12px; color: var(--muted); border-radius: var(--radius); font-weight: 500; }
+.nav button[aria-selected="true"] { color: var(--ink); background: var(--surface2); }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 18px 16px 48px; }
+.head { margin: 0 0 16px; }
+.head h1 { font-size: clamp(1.4rem, 3vw, 1.9rem); font-weight: 700; }
+.sub { color: var(--muted); margin: 6px 0 0; max-width: 70ch; }
+.view[hidden] { display: none; }
+
+/* ---- controls ---- */
+.btn { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 6px 12px; font-size: 14px; font-weight: 500; white-space: nowrap; }
+.btn:hover { border-color: var(--ink); }
+.btn.pri { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+.btn.sm { padding: 3px 9px; font-size: 13px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; flex-wrap: wrap; }
+.seg button { border: 0; background: var(--surface); padding: 6px 12px; font-size: 13px; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.search { padding: 7px 10px; border: 1px solid var(--line); background: var(--surface); border-radius: var(--radius); min-width: min(100%, 220px); }
+.pill { font: 500 10.5px var(--f-mono); text-transform: uppercase; letter-spacing: .06em; padding: 1px 6px; border-radius: 2px; background: var(--surface2); color: var(--muted); white-space: nowrap; display: inline-block; }
+.pill.ok { background: var(--ok-soft); color: var(--ok); } .pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.bad { background: var(--bad-soft); color: var(--bad); } .pill.info { background: var(--info-soft); color: var(--info); }
+.pill.acc { background: var(--accent-soft); color: var(--accent); }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 0 0 14px; }
+.banner { border: 1px solid var(--line); border-left: 4px solid var(--info); background: var(--surface); padding: 8px 12px; border-radius: var(--radius); font-size: 14px; margin: 0 0 14px; }
+.banner.warn { border-left-color: var(--warn); } .banner.ok { border-left-color: var(--ok); } .banner.bad { border-left-color: var(--bad); }
+.callout { border-left: 4px solid var(--info); background: var(--info-soft); padding: 10px 14px; border-radius: var(--radius); margin: 12px 0; font-size: 14.5px; }
+.callout.warn { border-color: var(--warn); background: var(--warn-soft); } .callout.tip { border-color: var(--ok); background: var(--ok-soft); } .callout.danger { border-color: var(--bad); background: var(--bad-soft); }
+
+/* ---- panes, tiles, tables, code ---- */
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; align-items: start; }
+.pane { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 16px; box-shadow: var(--shadow); min-width: 0; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 0 0 16px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; }
+.tile .k { font: 500 11px var(--f-mono); text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+.tile .v { font: 600 1.3rem var(--f-display); font-variant-numeric: tabular-nums; margin-top: 2px; }
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+th { background: var(--surface2); font-weight: 600; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+code { font-family: var(--f-mono); font-size: 13px; background: var(--surface2); padding: 1px 5px; border-radius: 3px; }
+.codeblock { background: var(--code-bg); color: var(--code-ink); border-radius: var(--radius-lg); margin: 10px 0; overflow: hidden; }
+.codeblock pre { margin: 0; padding: 12px; overflow-x: auto; font: 13px/1.5 var(--f-mono); }
+
+/* ---- diagram ---- */
+.stage { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-lg); overflow-x: auto; }
+.stage svg { display: block; width: 100%; height: auto; }
+.zone rect { fill: var(--surface); stroke: var(--line); stroke-width: 1.2; stroke-dasharray: 5 4; }
+.zone.t-accent rect { fill: var(--accent-soft); } .zone.t-info rect { fill: var(--info-soft); }
+.zone.t-ok rect { fill: var(--ok-soft); } .zone.t-warn rect { fill: var(--warn-soft); } .zone.t-bad rect { fill: var(--bad-soft); }
+.zone text { font: 500 11px var(--f-mono); letter-spacing: .08em; text-transform: uppercase; fill: var(--muted); }
+.node { cursor: pointer; transition: opacity .15s; }
+.node rect.box { fill: var(--surface); stroke: var(--line); stroke-width: 1.2; }
+.node:hover rect.box, .node:focus-visible rect.box { stroke: var(--accent); }
+.node.sel rect.box { stroke: var(--accent); stroke-width: 2.4; fill: var(--accent-soft); }
+.node rect.ico { fill: var(--accent-soft); } .node.sel rect.ico { fill: var(--surface); }
+.node text.i { font: 700 11px var(--f-mono); fill: var(--accent); text-anchor: middle; }
+.node text.n { font: 600 13px var(--f-body); fill: var(--ink); }
+.node text.s { font: 400 10.5px var(--f-mono); fill: var(--muted); }
+.edge path { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-linejoin: round; }
+.edge.dashed path { stroke-dasharray: 6 4; }
+.edge text { font: 500 10.5px var(--f-mono); fill: var(--muted); text-anchor: middle; paint-order: stroke; stroke: var(--bg); stroke-width: 5px; stroke-linejoin: round; }
+.edge.hi path { stroke: var(--accent); stroke-width: 2.4; }
+.edge.hi text { fill: var(--accent); }
+svg.focus .node:not(.rel), svg.focus .edge:not(.hi) { opacity: .28; }
+.edge.step path { stroke: var(--accent); stroke-width: 3; stroke-dasharray: 8 6; animation: flow .7s linear infinite; }
+@keyframes flow { to { stroke-dashoffset: -14; } }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); margin-top: 10px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 22px; height: 0; border-top: 2px solid var(--muted); display: inline-block; }
+.legend i.d { border-top-style: dashed; }
+.detail h2 { font-size: 1.15rem; margin: 6px 0 4px; }
+.detail dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 10px 0; font-size: 13.5px; }
+.detail dt { font: 500 11px var(--f-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding-top: 2px; }
+.detail dd { margin: 0; }
+.links { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 6px; }
+.links button { width: 100%; text-align: left; background: var(--surface2); border: 1px solid transparent; border-radius: var(--radius); padding: 6px 10px; font-size: 13.5px; }
+.links button:hover { border-color: var(--accent); }
+.links .lbl { font: 400 11px var(--f-mono); color: var(--muted); display: block; }
+.stepcap { font-size: 14px; min-height: 2.9em; margin: 8px 0 0; }
+
+@media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); } .stage svg { min-width: var(--minw, 760px); } }
+@media (prefers-reduced-motion: reduce) { .edge.step path { animation: none; } .node { transition: none; } }
+
+/* ---- guide content ---- */
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin: 0 0 16px; }
+.cols.three { grid-template-columns: repeat(3, minmax(0, 1fr)); } @media (max-width: 900px) { .cols.three { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); } }
+.cols .pane h3 { margin: 0 0 6px; font-size: 1.02rem; }
+.cols .pane p, .pane p { margin: 6px 0; }
+.pane ul { margin: 6px 0; padding-left: 20px; } .pane li { margin: 3px 0; }
+.section-h { font: 600 1.2rem var(--f-display); margin: 26px 0 10px; }
+.lead { font-size: 1.05rem; max-width: 74ch; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: 14px; margin: 8px 0; }
+.kv dt { font: 500 11px var(--f-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding-top: 3px; } .kv dd { margin: 0; }
+.steps { counter-reset: s; list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 8px; }
+.steps li { counter-increment: s; display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: start; }
+.steps li::before { content: counter(s); width: 24px; height: 24px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); font: 700 12px var(--f-mono); display: grid; place-items: center; }
+.tag { display: inline-block; font: 500 11px var(--f-mono); background: var(--surface2); border-radius: 3px; padding: 1px 6px; margin: 0 4px 4px 0; }
+.repo { display: none; } .repo.on { display: inline-flex; }
+@media (max-width: 600px) { .kv { grid-template-columns: 1fr; } }
+/* ==== Valhalla skin ==== */
+body { background-image: radial-gradient(90% 420px at 50% 0, color-mix(in srgb, var(--accent) 15%, transparent), transparent 72%); background-repeat: no-repeat; }
+h1, h2, h3 { font-weight: 600; letter-spacing: .04em; font-variant-numeric: lining-nums; }
+.head h1 { font-weight: 500; font-size: clamp(1.6rem, 3.4vw, 2.5rem); text-transform: uppercase; letter-spacing: .12em; color: var(--accent); }
+.eyebrow, .tile .k, .pill, th { font-family: var(--f-body); letter-spacing: .16em; }
+.bar { background: color-mix(in srgb, var(--bg) 94%, transparent); }
+.brand { font: 600 16px var(--f-display); letter-spacing: .16em; text-transform: uppercase; }
+.brand i { width: 20px; height: 22px; border-radius: 0; background: var(--accent); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 108'%3E%3Cpath d='M 44.5 20 L 55.5 20 L 56.5 74 L 50 92 L 43.5 74 Z M 50 4 L 43 12 C 33 13 21 10 9 3 C 3 16 6 31 17 42 C 23 30 33 23 44.5 22 L 50 22 Z M 50 4 L 57 12 C 67 13 79 10 91 3 C 97 16 94 31 83 42 C 77 30 67 23 55.5 22 L 50 22 Z M 22 92 C 33 100 44 101.5 50 97.5 C 56 101.5 67 100 78 92 C 68 105 57 106 50 102 C 43 106 32 105 22 92 Z'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 108'%3E%3Cpath d='M 44.5 20 L 55.5 20 L 56.5 74 L 50 92 L 43.5 74 Z M 50 4 L 43 12 C 33 13 21 10 9 3 C 3 16 6 31 17 42 C 23 30 33 23 44.5 22 L 50 22 Z M 50 4 L 57 12 C 67 13 79 10 91 3 C 97 16 94 31 83 42 C 77 30 67 23 55.5 22 L 50 22 Z M 22 92 C 33 100 44 101.5 50 97.5 C 56 101.5 67 100 78 92 C 68 105 57 106 50 102 C 43 106 32 105 22 92 Z'/%3E%3C/svg%3E") center / contain no-repeat; }
+.nav button { text-transform: uppercase; letter-spacing: .16em; font-size: 12px; border-radius: 0; }
+.nav button[aria-selected="true"] { background: none; color: var(--ink); box-shadow: inset 0 -2px 0 var(--accent); }
+.btn { text-transform: uppercase; letter-spacing: .12em; font-size: 12px; }
+.btn.sm { font-size: 11px; }
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn.pri:hover { color: var(--accent-ink); }
+.seg button { text-transform: uppercase; letter-spacing: .1em; font-size: 11.5px; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.pane { box-shadow: none; background: linear-gradient(180deg, color-mix(in srgb, var(--surface2) 70%, var(--surface)), var(--surface)); border-image: linear-gradient(135deg, var(--accent), var(--line) 14px, var(--line) calc(100% - 14px), var(--accent)) 1; }
+.tile { background: linear-gradient(180deg, color-mix(in srgb, var(--surface2) 70%, var(--surface)), var(--surface)); }
+.tile .v { font-size: 1.55rem; font-variant-numeric: lining-nums tabular-nums; }
+th { background: transparent; font-weight: 500; font-size: 11px; text-transform: uppercase; color: var(--muted); }
+.stage { background: color-mix(in srgb, var(--surface) 55%, var(--bg)); }
+.zone rect, .node rect.box, .node rect.ico { rx: 0; ry: 0; }
+.zone text { font-family: var(--f-body); letter-spacing: .18em; }
+.node text.i { font-family: var(--f-display); font-size: 13px; }
+.node.sel rect.box { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 60%, transparent)); }
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <span class="brand"><i></i><span id="brand">Example system</span></span>
+  <nav class="nav" id="nav" role="tablist" aria-label="Views"></nav>
+  <span class="grow"></span>
+  <button class="btn sm" id="themeBtn" title="Switch theme">Theme: system</button>
+</header>
+
+<main class="wrap">
+  <div class="head">
+    <div class="eyebrow" id="eyebrow">Guide</div>
+    <h1 id="title">x</h1>
+    <p class="sub" id="subtitle"></p>
+  </div>
+
+  <section class="view" id="v-overview">
+<p class="lead">The Proxmox VE host is the <b>heavy compute and storage node</b>: eight lightweight Linux containers (LXC) for databases, automation, development, media and the Docs platform, plus a dedicated backup server. It is switched on when needed, which keeps the power bill small.</p><div class="tiles"><div class="tile"><div class="k">CPU</div><div class="v">6C / 12T</div></div><div class="tile"><div class="k">RAM</div><div class="v">16 GB</div></div><div class="tile"><div class="k">Containers</div><div class="v">8</div></div><div class="tile"><div class="k">Disks</div><div class="v">3</div></div><div class="tile"><div class="k">Autostart after reboot</div><div class="v">1 of 8</div></div></div><div class="cols three"><div class="pane"><h3>Why LXC containers</h3><p>LXCs share the host kernel, so each one costs a few hundred MB instead of a whole virtual machine. Docker runs <em>inside</em> some of them ("Docker hosts"), while others run a single native service managed by systemd.</p></div><div class="pane"><h3>Why on demand</h3><p>The server idles at a few watts but a Ryzen box still costs more than a Pi. The always-on Pi wakes it with Wake-on-LAN and starts or stops individual containers through the API, so only what you use is running.</p></div><div class="pane"><h3>Why a separate backup server</h3><p>Proxmox Backup Server de-duplicates and compresses, so seven nightly copies of every container fit on a 240 GB SSD. It lives on its own disk, apart from the data it protects.</p></div></div><div class="callout tip"><b>How to read this page.</b> <em>Architecture</em> shows where each container sits; click a box. <em>Containers</em> has the roster with a filter, <em>Storage</em> and <em>Backups and power</em> explain the disks and the honest limits of the design.</div>
+  </section>
+
+  <section class="view" id="v-diagram" hidden>
+    <div class="toolbar">
+      <div class="seg" id="layers" role="group" aria-label="Layers"></div>
+      <input class="search" id="q" type="search" placeholder="Find a component…" aria-label="Find a component">
+      <span class="grow"></span>
+      <label class="muted" for="flowSel" style="font-size:13px">Walk through</label>
+      <select class="search" id="flowSel" style="min-width:0"></select>
+      <button class="btn sm" id="prev" aria-label="Previous step">◀</button>
+      <button class="btn sm pri" id="play">▶ Play</button>
+      <button class="btn sm" id="next" aria-label="Next step">▶|</button>
+    </div>
+    <div class="layout">
+      <div>
+        <div class="stage"><svg id="svg" role="img" aria-label="Proxmox Compute and Backup Node diagram"></svg></div>
+        <p class="stepcap" id="stepcap" aria-live="polite"></p>
+        <div class="legend">
+          <span><i></i> request / data</span><span><i class="d"></i> async / optional</span>
+          <span>Click a box for details · hover to trace its connections · Esc clears</span>
+        </div>
+      </div>
+      <aside class="pane detail" id="detail" aria-live="polite"></aside>
+    </div>
+    <div class="callout">Container IDs (100 to 999) are the Proxmox numbers used in commands such as <code>pct start 120</code>. Boxes are grouped by how the service runs: Docker inside the container, or a single native service.</div>
+  </section>
+
+  <section class="view" id="v-containers" hidden>
+<div class="toolbar"><div class="seg" data-filter="pxtb" data-count="pxcount" role="group" aria-label="Filter"><button aria-pressed="true" data-f="all">All</button><button aria-pressed="false" data-f="docker">Docker hosts</button><button aria-pressed="false" data-f="native">Native services</button><button aria-pressed="false" data-f="backup">Backup</button></div><span class="muted" id="pxcount"></span></div><div class="tablewrap"><table><thead><tr><th>ID</th><th>Name</th><th>What runs</th><th>Resources</th><th>Start mode</th></tr></thead><tbody id="pxtb"><tr data-cat="docker"><td class="mono">100</td><td><b>UbuntuCT</b></td><td>Open WebUI (chat front end), Trilium notes, XWiki wiki + PostgreSQL</td><td class="mono" style="font-size:12px">2 cores / 4 GB</td><td><span class="pill">on demand</span></td></tr><tr data-cat="native"><td class="mono">101</td><td><b>n8n</b></td><td>n8n workflow automation, systemd service</td><td class="mono" style="font-size:12px">2 cores / 2 GB</td><td><span class="pill">on demand</span></td></tr><tr data-cat="native"><td class="mono">102</td><td><b>postgres-turnkey</b></td><td>TurnKey PostgreSQL 15 with Webmin and Adminer</td><td class="mono" style="font-size:12px">2 cores / 2 GB</td><td><span class="pill">on demand</span></td></tr><tr data-cat="native"><td class="mono">103</td><td><b>code-server</b></td><td>Browser VS Code workstation, Docker, Tailscale, AI tools</td><td class="mono" style="font-size:12px">8 cores / 8 GB</td><td><span class="pill">on demand</span></td></tr><tr data-cat="native"><td class="mono">104</td><td><b>agent-server</b></td><td>AI-agent orchestration service (Paperclip)</td><td class="mono" style="font-size:12px">4 cores / 8 GB</td><td><span class="pill">on demand</span></td></tr><tr data-cat="docker"><td class="mono">120</td><td><b>docs</b></td><td>Docs knowledge base + public portfolio + tunnel</td><td class="mono" style="font-size:12px">2 cores / 2 GB</td><td><span class="pill">on demand</span></td></tr><tr data-cat="docker"><td class="mono">210</td><td><b>download-server</b></td><td>Jellyfin, qBittorrent, JDownloader, File Browser, ClamAV scanner</td><td class="mono" style="font-size:12px">4 cores / 2 GB</td><td><span class="pill">on demand</span></td></tr><tr data-cat="backup"><td class="mono">999</td><td><b>pbs</b></td><td>Proxmox Backup Server</td><td class="mono" style="font-size:12px">1 core / 2 GB</td><td><span class="pill ok">autostart, running</span></td></tr></tbody></table></div><div class="callout">Containers are <b>unprivileged</b> (root inside is an ordinary user outside) except the backup server, which needs access to the datastore disk. Containers that run Docker or Tailscale enable <code>nesting</code>, and Tailscale also needs the TUN device.</div>
+  </section>
+
+  <section class="view" id="v-storage" hidden>
+<div class="cols three"><div class="pane"><h3>NVMe SSD, 1 TB</h3><dl class="kv"><dt>Format</dt><dd>LVM with a thin pool</dd><dt>Holds</dt><dd>the host OS and every container's root disk</dd><dt>Used</dt><dd>~11 % of the thin pool</dd><dt>Snapshots</dt><dd>instant, copy-on-write</dd></dl></div><div class="pane"><h3>SATA SSD, 1 TB: ZFS</h3><dl class="kv"><dt>Pool</dt><dd>tb1_data_ssd, one disk</dd><dt>Holds</dt><dd>the media library (mounted into one container)</dd><dt>Used</dt><dd>about 80 %</dd><dt>Health</dt><dd>monthly scrub, 0 errors</dd></dl></div><div class="pane"><h3>SATA SSD, 240 GB</h3><dl class="kv"><dt>Format</dt><dd>ext4</dd><dt>Holds</dt><dd>the Backup Server datastore</dd><dt>Used</dt><dd>~30 %</dd><dt>Visible as</dt><dd>a directory storage in Proxmox as well</dd></dl></div></div><h2 class="section-h">Storage definitions in Proxmox</h2><div class="tablewrap"><table><thead><tr><th>Name</th><th>Type</th><th>Used for</th></tr></thead><tbody><tr><td>local</td><td>directory</td><td>ISO images, container templates, ad-hoc dumps</td></tr><tr><td>local-lvm</td><td>LVM-thin</td><td>root disks of all containers</td></tr><tr><td>tb1_data_ssd</td><td>ZFS pool</td><td>mount-point volumes (media)</td></tr><tr><td>pbs-ssd</td><td>directory (checked as a mount)</td><td>raw view of the backup disk</td></tr><tr><td>pbs-remote</td><td>Proxmox Backup Server</td><td>what the backup job and restores use</td></tr></tbody></table></div><div class="callout warn"><b>Roadmap.</b> The media pool is a single disk and, being a mount point, is not part of container backups. A mirror (or a second copy) is planned before it passes about 85 % full.</div>
+  </section>
+
+  <section class="view" id="v-backup" hidden>
+<div class="cols"><div class="pane"><h3>The nightly job</h3><ol class="steps"><li><div>04:30 every day the scheduler runs on all containers, stopped ones included.</div></li><li><div>Mode is <b>snapshot</b>: running containers keep running.</div></li><li><div>Each backup goes to the Backup Server; the job keeps the newest seven per container.</div></li><li><div>A report is mailed to the owner.</div></li></ol></div><div class="pane"><h3>What is protected</h3><ul><li>Every container: root disk and config</li><li>The Raspberry Pi: weekly full-disk backup</li><li><b>Not</b> included: the media volume (a mount point) and the host's own settings, which are kept as files in a repository</li></ul></div></div><h2 class="section-h">The power model, and what it means for backups</h2><div class="cols"><div class="pane"><h3>After a reboot</h3><p>Only the Backup Server container has <code>onboot</code> set, so it comes up first. Everything else waits to be started from the Hub or with <code>pct start</code>.</p></div><div class="pane"><h3>Gaps are normal</h3><p>Backups only run on days the host happens to be awake. There is no catch-up, so a missed night is a missing night. Before shutting the server down for a long time, take a manual backup.</p></div></div><div class="callout warn"><b>Roadmap for the backup side:</b> a scheduled prune and garbage-collection job on the Backup Server, a verify schedule and a copy outside the house.</div>
+  </section>
+
+  <section class="view" id="v-rebuild" hidden>
+<p class="lead">The host can be rebuilt from a bare machine because its settings are kept as files and every container is in the backup datastore, which sits on its own disk.</p><ol class="steps"><li><div><b>Install Proxmox VE</b> on the NVMe only, with the data disks unplugged so the installer cannot touch them. Set the fixed address and hostname.</div></li><li><div><b>Reattach the disks.</b> Mount the backup SSD by UUID; <em>import</em> the ZFS pool (never create over it).</div></li><li><div><b>Apply the host settings:</b> Wake-on-LAN unit, firewall files, storage definitions and the backup job, from the saved configuration files; join Tailscale.</div></li><li><div><b>Bring the Backup Server back first</b> (from its own dump or by reinstalling and re-adding the existing datastore), then add it as <code>pbs-remote</code>.</div></li><li><div><b>Restore containers</b> in dependency order: database, web and AI host, automation, dev box, agent server, Docs, then the media container (reattach its ZFS volume instead of creating a new one).</div></li><li><div><b>Verify</b> storage status, the container list, the Hub, the public pages and that the next backup run creates new snapshots.</div></li></ol><h2 class="section-h">Everyday commands</h2><pre class="codeblock">pct list                         # container states
+pct start 999 &amp;&amp; pct start 102   # backup server first, then the database
+pct exec 120 -- docker ps         # run a command inside a container
+pct snapshot 103 before-change    # instant rollback point
+zpool status tb1_data_ssd         # media pool health
+pvesm status                      # storage and backup server status</pre>
+  </section>
+
+  <section class="view" id="v-table" hidden>
+    <div class="toolbar"><span class="muted" id="count"></span></div>
+    <div class="tablewrap"><table id="tbl"></table></div>
+  </section>
+</main>
+
+
+<script>
+/* ============================ 1. EDIT THIS: the content ============================
+   Coordinates live on a virtual canvas (VIEW.w x VIEW.h); the SVG scales to the width available.
+   Nodes are NW x NH (156 x 54). Leave ~40px between nodes so edge labels fit. A node's `zone` is only a grouping label
+   for the table; zones are drawn from their own x/y/w/h. `layer` is optional: nodes/edges with a layer can be toggled. */
+const DATA = {
+ "brand": "Homelab",
+ "eyebrow": "Proxmox VE reference",
+ "title": "Proxmox Compute and Backup Node",
+ "subtitle": "A small server that runs eight lightweight containers and the backup server, switched on only when needed.",
+ "view": {
+  "w": 1370,
+  "h": 770
+ },
+ "zones": [
+  {
+   "id": "pi",
+   "label": "Raspberry Pi",
+   "x": 20,
+   "y": 40,
+   "w": 226,
+   "h": 120,
+   "tone": "ok"
+  },
+  {
+   "id": "lan",
+   "label": "Home network + Tailscale",
+   "x": 20,
+   "y": 200,
+   "w": 226,
+   "h": 110,
+   "tone": "ok"
+  },
+  {
+   "id": "pve",
+   "label": "Proxmox VE 9 host",
+   "x": 290,
+   "y": 40,
+   "w": 1060,
+   "h": 710,
+   "tone": ""
+  },
+  {
+   "id": "dock",
+   "label": "Docker-in-LXC hosts",
+   "x": 570,
+   "y": 190,
+   "w": 230,
+   "h": 330,
+   "tone": "info"
+  },
+  {
+   "id": "native",
+   "label": "Native-service LXCs",
+   "x": 306,
+   "y": 190,
+   "w": 230,
+   "h": 450,
+   "tone": ""
+  },
+  {
+   "id": "stor",
+   "label": "Storage",
+   "x": 840,
+   "y": 80,
+   "w": 490,
+   "h": 260,
+   "tone": "warn"
+  },
+  {
+   "id": "bk",
+   "label": "Backup",
+   "x": 840,
+   "y": 380,
+   "w": 490,
+   "h": 260,
+   "tone": "ok"
+  }
+ ],
+ "layers": [
+  {
+   "id": "backup",
+   "label": "Backups"
+  }
+ ],
+ "nodes": [
+  {
+   "id": "hubpi",
+   "zone": "pi",
+   "ico": "HB",
+   "label": "Hub on the Pi",
+   "sub": "dashboard + WoL",
+   "x": 36,
+   "y": 90,
+   "desc": "The Pi sends the Wake-on-LAN packet and later the confirmed start and stop commands through the Proxmox API. It also runs the weekly Pi backup.",
+   "facts": [
+    [
+     "Wakes",
+     "the host's network card (Wake-on-LAN)"
+    ],
+    [
+     "Controls",
+     "guests through an API token"
+    ]
+   ]
+  },
+  {
+   "id": "you",
+   "zone": "lan",
+   "ico": "YB",
+   "label": "You",
+   "sub": "browser, VPN",
+   "x": 36,
+   "y": 232,
+   "desc": "You manage everything through the Proxmox web UI: dashboards, and a shell on the host or on any container. The UI is reachable on the home network and, published by Tailscale, from anywhere. Individual services (Jellyfin, n8n, code-server...) can also be opened directly on their own ports.",
+   "facts": [
+    [
+     "Proxmox web UI",
+     "host and container shells, console, backups"
+    ],
+    [
+     "Direct",
+     "each service's own port on the home network"
+    ],
+    [
+     "Tailscale",
+     "web UI, dev box, Docs editor"
+    ]
+   ]
+  },
+  {
+   "id": "api",
+   "zone": "pve",
+   "ico": "PV",
+   "label": "Host manager",
+   "sub": "web UI + API :8006",
+   "x": 320,
+   "y": 90,
+   "desc": "Proxmox itself: web UI, API, scheduler and firewall. Also joined to the private VPN and published to the tailnet only.",
+   "facts": [
+    [
+     "Port",
+     "8006"
+    ],
+    [
+     "You get",
+     "web UI with a shell on the host and on every container"
+    ],
+    [
+     "Host OS",
+     "Debian 13 'trixie', kernel 7.0 (pve)"
+    ],
+    [
+     "Cluster",
+     "single node"
+    ],
+    [
+     "Network card",
+     "Wake-on-LAN enabled at every boot"
+    ]
+   ]
+  },
+  {
+   "id": "media",
+   "zone": "dock",
+   "ico": "MD",
+   "label": "Media (210)",
+   "sub": "media stack",
+   "x": 594,
+   "y": 230,
+   "desc": "A Docker host for the media stack: Jellyfin, qBittorrent, JDownloader, File Browser and a ClamAV scan service that quarantines infected downloads.",
+   "facts": [
+    [
+     "Resources",
+     "4 cores, 2 GB RAM"
+    ],
+    [
+     "Ports",
+     "8096, 8090, 5800, 8080, 8091"
+    ],
+    [
+     "Data",
+     "ZFS volume mounted at /sata/downloads"
+    ]
+   ]
+  },
+  {
+   "id": "docs",
+   "zone": "dock",
+   "ico": "DC",
+   "label": "Docs (120)",
+   "sub": "docs + portfolio",
+   "x": 594,
+   "y": 330,
+   "desc": "The Docs knowledge base and the public portfolio platform, with its own Cloudflare tunnel and Tailscale.",
+   "facts": [
+    [
+     "Resources",
+     "2 cores, 2 GB RAM"
+    ],
+    [
+     "Containers",
+     "editor, two public servers, tunnel connector"
+    ],
+    [
+     "Editor port",
+     "3020"
+    ]
+   ]
+  },
+  {
+   "id": "web",
+   "zone": "dock",
+   "ico": "UB",
+   "label": "Web + AI (100)",
+   "sub": "chat, notes, wiki",
+   "x": 594,
+   "y": 430,
+   "desc": "A Docker host for personal tools: the Open WebUI chat front end, Trilium notes and an XWiki wiki with its own PostgreSQL.",
+   "facts": [
+    [
+     "Resources",
+     "2 cores, 4 GB RAM"
+    ],
+    [
+     "Ports",
+     "3001, 8081, 8080"
+    ]
+   ]
+  },
+  {
+   "id": "n8n",
+   "zone": "native",
+   "ico": "N8",
+   "label": "Automation (101)",
+   "sub": "n8n, native",
+   "x": 330,
+   "y": 230,
+   "desc": "Workflow automation installed with npm and run by systemd, no Docker.",
+   "facts": [
+    [
+     "Resources",
+     "2 cores, 2 GB RAM"
+    ],
+    [
+     "Port",
+     "5678"
+    ],
+    [
+     "Version",
+     "n8n 2.x"
+    ]
+   ]
+  },
+  {
+   "id": "pg",
+   "zone": "native",
+   "ico": "PG",
+   "label": "PostgreSQL (102)",
+   "sub": "TurnKey appliance",
+   "x": 330,
+   "y": 330,
+   "desc": "The shared database server: a TurnKey Linux PostgreSQL 15 appliance with Webmin and Adminer for administration.",
+   "facts": [
+    [
+     "Resources",
+     "2 cores, 2 GB RAM"
+    ],
+    [
+     "Ports",
+     "5432, 12321, 12322"
+    ]
+   ]
+  },
+  {
+   "id": "code",
+   "zone": "native",
+   "ico": "CS",
+   "label": "Dev box (103)",
+   "sub": "code-server",
+   "x": 330,
+   "y": 430,
+   "desc": "A browser-based VS Code workstation with Docker, language toolchains and AI coding tools, also reachable over Tailscale.",
+   "facts": [
+    [
+     "Resources",
+     "8 cores, 8 GB RAM, 64 GB disk"
+    ],
+    [
+     "Port",
+     "8680"
+    ],
+    [
+     "Safety net",
+     "5 snapshots of its disk"
+    ]
+   ]
+  },
+  {
+   "id": "agent",
+   "zone": "native",
+   "ico": "AG",
+   "label": "Agent server (104)",
+   "sub": "Paperclip",
+   "x": 330,
+   "y": 530,
+   "desc": "A systemd service that runs an AI-agent orchestration app for experiments.",
+   "facts": [
+    [
+     "Resources",
+     "4 cores, 8 GB RAM"
+    ],
+    [
+     "Port",
+     "3100"
+    ],
+    [
+     "Runs as",
+     "an unprivileged service user"
+    ]
+   ]
+  },
+  {
+   "id": "nvme",
+   "zone": "stor",
+   "ico": "NV",
+   "label": "NVMe SSD",
+   "sub": "1 TB, LVM-thin",
+   "x": 860,
+   "y": 110,
+   "desc": "System disk. LVM-thin holds the root disk of every container, so snapshots are instant and space is only used when written.",
+   "facts": [
+    [
+     "Holds",
+     "host OS + all container root disks"
+    ],
+    [
+     "Thin pool",
+     "about 794 GB, ~11 % used"
+    ]
+   ]
+  },
+  {
+   "id": "zfs",
+   "zone": "stor",
+   "ico": "ZF",
+   "label": "ZFS media pool",
+   "sub": "1 TB SATA SSD",
+   "x": 1130,
+   "y": 230,
+   "desc": "A ZFS pool mounted into the media container. Large, replaceable data lives here instead of in container backups.",
+   "facts": [
+    [
+     "Use",
+     "about 80 %"
+    ],
+    [
+     "Layout",
+     "single disk, no mirror"
+    ],
+    [
+     "Scrub",
+     "monthly, last run found 0 errors"
+    ]
+   ]
+  },
+  {
+   "id": "job",
+   "zone": "bk",
+   "ico": "VZ",
+   "label": "Backup job",
+   "sub": "daily 04:30",
+   "x": 860,
+   "y": 420,
+   "desc": "A Proxmox scheduler job: every container, snapshot mode (no downtime), keep the last 7, e-mail report.",
+   "facts": [
+    [
+     "When",
+     "04:30 every day"
+    ],
+    [
+     "Mode",
+     "snapshot"
+    ],
+    [
+     "Retention",
+     "keep-last 7"
+    ]
+   ],
+   "layer": "backup"
+  },
+  {
+   "id": "pbs",
+   "zone": "bk",
+   "ico": "PB",
+   "label": "Backup server (999)",
+   "sub": "PBS",
+   "x": 1130,
+   "y": 420,
+   "desc": "A privileged LXC running Proxmox Backup Server. The only guest that starts by itself after a reboot.",
+   "facts": [
+    [
+     "Resources",
+     "1 core, 2 GB RAM"
+    ],
+    [
+     "Port",
+     "8007"
+    ],
+    [
+     "Autostart",
+     "yes"
+    ]
+   ],
+   "layer": "backup"
+  },
+  {
+   "id": "pbssd",
+   "zone": "bk",
+   "ico": "SD",
+   "label": "Backup SSD",
+   "sub": "240 GB, datastore",
+   "x": 1130,
+   "y": 540,
+   "desc": "The datastore disk, bind-mounted into the backup container. Backups are chunked and de-duplicated.",
+   "facts": [
+    [
+     "Size",
+     "240 GB, about 30 % used"
+    ],
+    [
+     "Holds",
+     "all container backups + the Pi"
+    ]
+   ],
+   "layer": "backup"
+  }
+ ],
+ "edges": [
+  {
+   "from": "hubpi",
+   "to": "api",
+   "label": "WoL + API"
+  },
+  {
+   "from": "you",
+   "to": "api",
+   "label": "web UI :8006"
+  },
+  {
+   "from": "api",
+   "to": "nvme",
+   "label": "LVM-thin storage"
+  },
+  {
+   "from": "media",
+   "to": "zfs",
+   "label": "mount /sata/downloads"
+  },
+  {
+   "from": "n8n",
+   "to": "pg",
+   "label": "SQL"
+  },
+  {
+   "from": "job",
+   "to": "pbs",
+   "label": "vzdump",
+   "layer": "backup"
+  },
+  {
+   "from": "pbs",
+   "to": "pbssd",
+   "label": "datastore",
+   "layer": "backup"
+  },
+  {
+   "from": "hubpi",
+   "to": "pbs",
+   "label": "weekly Pi backup",
+   "style": "dashed",
+   "layer": "backup",
+   "via": [
+    [
+     270,
+     117
+    ],
+    [
+     270,
+     722
+    ],
+    [
+     1340,
+     722
+    ],
+    [
+     1340,
+     447
+    ]
+   ]
+  }
+ ],
+ "flows": [
+  {
+   "name": "Wake the server and start a container",
+   "steps": [
+    [
+     0,
+     "The Pi broadcasts a Wake-on-LAN packet; the host's network card boots the machine."
+    ],
+    [
+     2,
+     "Proxmox starts and mounts its storage; only the backup container autostarts."
+    ],
+    [
+     0,
+     "The Pi then calls the API with a confirmed 'start' for the container you chose."
+    ]
+   ]
+  },
+  {
+   "name": "Nightly backup",
+   "steps": [
+    [
+     5,
+     "At 04:30 the scheduler snapshots every container and sends it to the backup server."
+    ],
+    [
+     6,
+     "The server splits it into chunks, skips the ones it already has and writes the rest to its SSD."
+    ]
+   ]
+  },
+  {
+   "name": "Weekly Pi backup",
+   "steps": [
+    [
+     7,
+     "On Sundays the Pi uploads its own filesystem to the same backup server."
+    ],
+    [
+     6,
+     "It lands in a separate backup group on the same datastore."
+    ]
+   ]
+  }
+ ]
+};
+/* ============================ 2. ENGINE (usually leave as is) ============================ */
+const NW = 180, NH = 54, $ = (s, r = document) => r.querySelector(s);
+const byId = Object.fromEntries(DATA.nodes.map((n) => [n.id, n]));
+const svg = $("#svg"), NS = "http://www.w3.org/2000/svg";
+const state = { sel: null, hidden: new Set(), q: "", flow: 0, step: -1, timer: null };
+function mk(tag, attrs, parent, text) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; if (parent) parent.appendChild(e); return e; }
+function h(tag, attrs, ...kids) { const e = document.createElement(tag); for (const k in (attrs || {})) { if (k === "class") e.className = attrs[k]; else if (k.startsWith("on")) e[k] = attrs[k]; else e.setAttribute(k, attrs[k]); } for (const c of kids.flat()) if (c != null) e.append(c.nodeType ? c : document.createTextNode(c)); return e; }
+
+function edgeGeom(e) {
+  const a = byId[e.from], b = byId[e.to];
+  const edge = (n, tx, ty) => { // point where the line from the node centre toward (tx,ty) leaves the box
+    const px = n.x + NW / 2, py = n.y + NH / 2, vx = tx - px, vy = ty - py;
+    const t = Math.min((NW / 2 + 3) / (Math.abs(vx) || 1e-6), (NH / 2 + 3) / (Math.abs(vy) || 1e-6));
+    return [px + vx * t, py + vy * t];
+  };
+  const ax = a.x + NW / 2, ay = a.y + NH / 2, bx = b.x + NW / 2, by = b.y + NH / 2;
+  if (e.via && e.via.length) { // waypoints [[x,y],...]: route around nodes instead of cutting across them
+    const first = e.via[0], last = e.via[e.via.length - 1];
+    const [x1, y1] = edge(a, first[0], first[1]), [x2, y2] = edge(b, last[0], last[1]);
+    const pts = [[x1, y1], ...e.via, [x2, y2]];
+    let best = 0, bl = -1; for (let i = 0; i < pts.length - 1; i++) { const l = Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]); if (l > bl) { bl = l; best = i; } }
+    return { d: "M" + pts.map((p) => p.join(",")).join(" L"), lx: (pts[best][0] + pts[best + 1][0]) / 2, ly: (pts[best][1] + pts[best + 1][1]) / 2 - 5 };
+  }
+  const reverse = DATA.edges.some((o) => o.from === e.to && o.to === e.from);
+  const bend = e.bend ?? (reverse ? 16 : 0);
+  const dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy) || 1;
+  const cx = (ax + bx) / 2 + (-dy / len) * bend * 2, cy = (ay + by) / 2 + (dx / len) * bend * 2;
+  const [x1, y1] = edge(a, cx, cy), [x2, y2] = edge(b, cx, cy);
+  const d = bend ? `M${x1},${y1} Q${cx},${cy} ${x2},${y2}` : `M${x1},${y1} L${x2},${y2}`;
+  const lx = bend ? 0.25 * x1 + 0.5 * cx + 0.25 * x2 : (x1 + x2) / 2, ly = (bend ? 0.25 * y1 + 0.5 * cy + 0.25 * y2 : (y1 + y2) / 2) - 5;
+  return { d, lx, ly };
+}
+
+function draw() {
+  svg.replaceChildren();
+  svg.setAttribute("viewBox", `0 0 ${DATA.view.w} ${DATA.view.h}`);
+  svg.style.setProperty("--minw", Math.min(DATA.view.w, 1100) * 0.9 + "px"); // phones scroll the diagram inside its frame instead of shrinking the text
+  const defs = mk("defs", {}, svg);
+  for (const [id, cls] of [["ar", "arrow"], ["arh", "arrow hi"]]) {
+    const m = mk("marker", { id, viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 8, markerHeight: 8, orient: "auto-start-reverse" }, defs);
+    mk("path", { d: "M0,0 L10,5 L0,10 z", class: cls, style: `fill:var(${id === "ar" ? "--muted" : "--accent"})` }, m);
+  }
+  for (const z of DATA.zones) {
+    const g = mk("g", { class: "zone" + (z.tone ? " t-" + z.tone : "") }, svg);
+    mk("rect", { x: z.x, y: z.y, width: z.w, height: z.h, rx: 6 }, g);
+    mk("text", { x: z.x + 12, y: z.y + 20 }, g, z.label);
+  }
+  const edgeEls = DATA.edges.map((e, i) => {
+    const g = mk("g", { class: "edge" + (e.style === "dashed" ? " dashed" : ""), "data-i": i }, svg);
+    const gm = edgeGeom(e);
+    const p = mk("path", { d: gm.d, "marker-end": "url(#ar)" }, g);
+    if (e.both) p.setAttribute("marker-start", "url(#ar)");
+    if (e.label) mk("text", { x: gm.lx, y: gm.ly }, g, e.label);
+    return g;
+  });
+  const nodeEls = DATA.nodes.map((n) => {
+    const g = mk("g", { class: "node", tabindex: 0, role: "button", "data-id": n.id, "aria-label": `${n.label}: ${n.sub || ""}` }, svg);
+    mk("rect", { class: "box", x: n.x, y: n.y, width: NW, height: NH, rx: 5 }, g);
+    mk("rect", { class: "ico", x: n.x + 9, y: n.y + 12, width: 30, height: 30, rx: 4 }, g);
+    mk("text", { class: "i", x: n.x + 24, y: n.y + 31 }, g, n.ico || n.label.slice(0, 2).toUpperCase());
+    mk("text", { class: "n", x: n.x + 48, y: n.y + 24 }, g, n.label);
+    mk("text", { class: "s", x: n.x + 48, y: n.y + 40 }, g, n.sub || "");
+    g.addEventListener("click", (ev) => { ev.stopPropagation(); select(n.id); });
+    g.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); select(n.id); } });
+    g.addEventListener("mouseenter", () => focusOn(n.id)); g.addEventListener("mouseleave", () => focusOn(state.sel));
+    g.addEventListener("focus", () => focusOn(n.id)); g.addEventListener("blur", () => focusOn(state.sel));
+    return g;
+  });
+  svg.addEventListener("click", () => select(null));
+  draw.edgeEls = edgeEls; draw.nodeEls = nodeEls;
+  applyVisibility();
+}
+
+function visibleNode(n) { return (!n.layer || !state.hidden.has(n.layer)) && (!state.q || (n.label + " " + (n.sub || "") + " " + (n.desc || "")).toLowerCase().includes(state.q)); }
+function applyVisibility() {
+  DATA.nodes.forEach((n, i) => { const on = visibleNode(n) || (state.q && false); draw.nodeEls[i].style.display = (!n.layer || !state.hidden.has(n.layer)) ? "" : "none"; draw.nodeEls[i].style.opacity = on ? "" : ".25"; });
+  DATA.edges.forEach((e, i) => { const hide = (e.layer && state.hidden.has(e.layer)) || (byId[e.from].layer && state.hidden.has(byId[e.from].layer)) || (byId[e.to].layer && state.hidden.has(byId[e.to].layer)); draw.edgeEls[i].style.display = hide ? "none" : ""; });
+}
+function focusOn(id) {
+  const rel = new Set(id ? [id] : []);
+  DATA.edges.forEach((e, i) => { const hit = id && (e.from === id || e.to === id); const el = draw.edgeEls[i]; el.classList.toggle("hi", !!hit); el.querySelector("path").setAttribute("marker-end", hit ? "url(#arh)" : "url(#ar)"); if (hit) { rel.add(e.from); rel.add(e.to); } });
+  DATA.nodes.forEach((n, i) => draw.nodeEls[i].classList.toggle("rel", rel.has(n.id)));
+  svg.classList.toggle("focus", !!id);
+}
+function select(id) {
+  state.sel = id; stopFlow();
+  DATA.nodes.forEach((n, i) => draw.nodeEls[i].classList.toggle("sel", n.id === id));
+  focusOn(id); renderDetail();
+}
+function renderDetail() {
+  const box = $("#detail"), n = byId[state.sel];
+  if (!n) { box.replaceChildren(h("div", { class: "eyebrow" }, "Details"), h("h2", {}, DATA.title), h("p", { class: "muted" }, "Select a component to see what it does, its settings and what it talks to."),
+    h("div", { class: "tiles" }, h("div", { class: "tile" }, h("div", { class: "k" }, "Components"), h("div", { class: "v" }, DATA.nodes.length)), h("div", { class: "tile" }, h("div", { class: "k" }, "Connections"), h("div", { class: "v" }, DATA.edges.length)))); return; }
+  const out = DATA.edges.filter((e) => e.from === n.id), inc = DATA.edges.filter((e) => e.to === n.id);
+  const link = (otherId, e) => h("li", {}, h("button", { onclick: () => select(otherId) }, h("span", { class: "lbl" }, e.label || ""), byId[otherId].label));
+  box.replaceChildren(...[
+    h("div", { class: "eyebrow" }, (DATA.zones.find((z) => z.id === n.zone) || {}).label || "Component"),
+    h("h2", {}, n.label), n.sub ? h("div", { class: "mono muted", style: "font-size:12.5px" }, n.sub) : null,
+    h("p", {}, n.desc || ""),
+    n.facts && n.facts.length ? h("dl", {}, n.facts.flatMap(([k, v]) => [h("dt", {}, k), h("dd", {}, v)])) : null,
+    out.length ? h("div", {}, h("div", { class: "eyebrow" }, "Talks to"), h("ul", { class: "links" }, out.map((e) => link(e.to, e)))) : null,
+    inc.length ? h("div", { style: "margin-top:12px" }, h("div", { class: "eyebrow" }, "Called by"), h("ul", { class: "links" }, inc.map((e) => link(e.from, e)))) : null].filter(Boolean));
+}
+
+/* walk-through */
+function stopFlow() { clearInterval(state.timer); state.timer = null; $("#play").textContent = "▶ Play"; }
+function showStep() {
+  const f = DATA.flows[state.flow]; if (!f) return;
+  draw.edgeEls.forEach((el) => el.classList.remove("step"));
+  if (state.step < 0) { $("#stepcap").textContent = f.steps.length + " steps. Press Play or use ◀ ▶|."; return; }
+  const [ei, text] = f.steps[state.step];
+  draw.edgeEls[ei].classList.add("step");
+  $("#stepcap").textContent = `Step ${state.step + 1} of ${f.steps.length}: ${text}`;
+  const e = DATA.edges[ei]; state.sel = null; focusOn(null); svg.classList.add("focus");
+  DATA.nodes.forEach((n, i) => draw.nodeEls[i].classList.toggle("rel", n.id === e.from || n.id === e.to));
+}
+function stepBy(d) { const f = DATA.flows[state.flow]; if (!f) return; state.step = Math.min(f.steps.length - 1, Math.max(-1, state.step + d)); showStep(); }
+function play() {
+  if (state.timer) { stopFlow(); return; }
+  const f = DATA.flows[state.flow]; if (!f) return;
+  state.step = -1; $("#play").textContent = "❚❚ Pause";
+  const tick = () => { if (state.step >= f.steps.length - 1) { stopFlow(); return; } stepBy(1); };
+  tick(); state.timer = setInterval(tick, 1800);
+}
+
+/* table view */
+function drawTable() {
+  const t = $("#tbl"); t.replaceChildren(h("thead", {}, h("tr", {}, ["Component", "Where", "What it does", "Sends data to"].map((c) => h("th", {}, c)))),
+    h("tbody", {}, DATA.nodes.map((n) => h("tr", {}, h("td", {}, h("b", {}, n.label), n.sub ? h("div", { class: "mono muted", style: "font-size:12px" }, n.sub) : null),
+      h("td", {}, (DATA.zones.find((z) => z.id === n.zone) || {}).label || ""), h("td", {}, n.desc || ""),
+      h("td", {}, DATA.edges.filter((e) => e.from === n.id).map((e) => byId[e.to].label).join(", ") || "-")))));
+  $("#count").textContent = DATA.nodes.length + " components, " + DATA.edges.length + " connections";
+}
+
+/* tabs, layers, search, theme, height reporting */
+const REPO = "";
+const VIEWS = [["overview", "Overview"], ["diagram", "Architecture"], ["containers", "Containers"], ["storage", "Storage"], ["backup", "Backups and power"], ["rebuild", "Rebuild order"], ["table", "Components"]];
+function showView(id) { for (const [v] of VIEWS) $("#v-" + v).hidden = v !== id; document.querySelectorAll("#nav button").forEach((b) => b.setAttribute("aria-selected", b.dataset.v === id)); reportHeight(); }
+function setup() {
+  document.title = DATA.title; $("#brand").textContent = DATA.brand; $("#eyebrow").textContent = DATA.eyebrow; $("#title").textContent = DATA.title; $("#subtitle").textContent = DATA.subtitle;
+  $("#nav").replaceChildren(...VIEWS.map(([v, l]) => h("button", { role: "tab", "data-v": v, onclick: () => showView(v) }, l)));
+  $("#layers").replaceChildren(...DATA.layers.map((l) => h("button", { "aria-pressed": "true", onclick: (ev) => { const b = ev.currentTarget, on = b.getAttribute("aria-pressed") !== "true"; b.setAttribute("aria-pressed", on); on ? state.hidden.delete(l.id) : state.hidden.add(l.id); applyVisibility(); } }, l.label)));
+  if (!DATA.layers.length) $("#layers").remove();
+  $("#flowSel").replaceChildren(...DATA.flows.map((f, i) => h("option", { value: i }, f.name)));
+  if (!DATA.flows.length) ["#flowSel", "#prev", "#play", "#next", "label[for=flowSel]"].forEach((s) => $(s).remove());
+  $("#flowSel").onchange = (e) => { stopFlow(); state.flow = +e.target.value; state.step = -1; showStep(); };
+  $("#prev").onclick = () => { stopFlow(); stepBy(-1); }; $("#next").onclick = () => { stopFlow(); stepBy(1); }; $("#play").onclick = play;
+  $("#q").oninput = (e) => { state.q = e.target.value.trim().toLowerCase(); applyVisibility(); };
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { stopFlow(); state.step = -1; select(null); showStep(); } });
+  draw(); drawTable(); renderDetail(); showStep(); showView("overview");
+  if (REPO) { const a = $("#repoLink"); a.href = REPO; a.classList.add("on"); a.target = "_blank"; a.rel = "noopener noreferrer"; $("#repoText").textContent = REPO + "  (copy the address if your Docs page settings block pop-ups)";
+    const top = document.createElement("a"); top.className = "btn sm"; top.href = REPO; top.target = "_blank"; top.rel = "noopener noreferrer"; top.textContent = "GitHub"; $("#themeBtn").before(top); }
+}
+
+/* Theme + height protocol used when this page is shown inside Homelab Hub Docs (a sandboxed iframe). Works standalone too. */
+const root = document.documentElement; let themeMode = 0; // 0 system, 1 light, 2 dark
+function applyTheme(t) { t ? root.setAttribute("data-theme", t) : root.removeAttribute("data-theme"); $("#themeBtn").textContent = "Theme: " + (themeMode === 0 ? "system" : themeMode === 1 ? "light" : "dark"); }
+const fromUrl = new URLSearchParams(location.search).get("theme");
+if (fromUrl === "dark" || fromUrl === "light") { themeMode = fromUrl === "dark" ? 2 : 1; }
+addEventListener("message", (e) => { if (e.source === parent && e.data && e.data.type === "hub:theme") { themeMode = e.data.theme === "dark" ? 2 : 1; applyTheme(e.data.theme); } });
+$("#themeBtn").onclick = () => { themeMode = (themeMode + 1) % 3; applyTheme(themeMode === 0 ? null : themeMode === 1 ? "light" : "dark"); };
+function reportHeight() { try { parent.postMessage({ type: "hub:height", px: Math.ceil(Math.max(root.scrollHeight, document.body.scrollHeight)) }, "*"); } catch (_) {} }
+if (window.ResizeObserver) new ResizeObserver(reportHeight).observe(root);
+addEventListener("load", reportHeight);
+
+setup(); applyTheme(themeMode === 0 ? null : themeMode === 1 ? "light" : "dark");
+
+/* filter bars: <div data-filter="tbodyId" data-count="spanId"> with buttons data-f; rows carry data-cat */
+document.querySelectorAll("[data-filter]").forEach((bar) => {
+  const tb = document.getElementById(bar.dataset.filter), rows = [...tb.querySelectorAll("tr")], out = document.getElementById(bar.dataset.count);
+  const apply = (f) => { let n = 0; rows.forEach((r) => { const on = f === "all" || r.dataset.cat.split(" ").includes(f); r.hidden = !on; if (on) n++; });
+    if (out) out.textContent = n + " of " + rows.length; bar.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.f === f)); reportHeight(); };
+  bar.querySelectorAll("button").forEach((b) => (b.onclick = () => apply(b.dataset.f))); apply("all");
+});
+</script>
+</body>
+</html>

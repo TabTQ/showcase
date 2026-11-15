@@ -1,0 +1,681 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Homelab Hub Field Guide</title>
+<style>
+/* Homelab Hub "Signal" tokens, copied from docs/mockups. Light is the base; dark overrides below (system, then explicit). */
+:root {
+  --bg: #e7e1d5; --surface: #f2eee5; --surface2: #e0d9cb; --ink: #191c1b; --muted: #5a605d; --line: #c2baa9;
+  --accent: #067f72; --accent-ink: #f4f1ea; --accent-soft: #d3e4dc;
+  --ok: #2f7a36; --warn: #9a6408; --bad: #a8322a; --info: #23688f;
+  --ok-soft: #dbe8d3; --warn-soft: #f0e2c2; --bad-soft: #f0d6cf; --info-soft: #d5e2e6;
+  --code-bg: #0a181c; --code-ink: #dfe7e4;
+  --shadow: none;
+  --radius: 0px; --radius-lg: 0px;
+  --f-display: "Cormorant Garamond", "Palatino Linotype", Palatino, "Book Antiqua", "P052", Georgia, serif;
+  --f-body: "Barlow", "DIN Alternate", Bahnschrift, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: light; --ember: #b4531a; --gold: #8a6a2a;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #061215; --surface: #0a181c; --surface2: #10262b; --ink: #dfe7e4; --muted: #8b9b98; --line: #1c383e;
+    --accent: #40c1ac; --accent-ink: #03110f; --accent-soft: #0d2c2b; --ok: #9ad17a; --warn: #e5b04a; --bad: #e0564a; --info: #6ab8e6;
+    --ok-soft: #17291a; --warn-soft: #2e2613; --bad-soft: #321715; --info-soft: #12283a; --code-bg: #020607; --code-ink: #dfe7e4;
+    --shadow: none; color-scheme: dark; --ember: #e0752a; --gold: #c9a45c;
+}
+}
+:root[data-theme="dark"] {
+  --bg: #061215; --surface: #0a181c; --surface2: #10262b; --ink: #dfe7e4; --muted: #8b9b98; --line: #1c383e;
+  --accent: #40c1ac; --accent-ink: #03110f; --accent-soft: #0d2c2b; --ok: #9ad17a; --warn: #e5b04a; --bad: #e0564a; --info: #6ab8e6;
+  --ok-soft: #17291a; --warn-soft: #2e2613; --bad-soft: #321715; --info-soft: #12283a; --code-bg: #020607; --code-ink: #dfe7e4;
+  --shadow: none; color-scheme: dark; --ember: #e0752a; --gold: #c9a45c;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 var(--f-body); }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+a { color: var(--accent); }
+h1, h2, h3 { font-family: var(--f-display); line-height: 1.2; margin: 0; }
+.mono { font-family: var(--f-mono); }
+.muted { color: var(--muted); }
+.grow { flex: 1; }
+.eyebrow { font: 500 11px var(--f-mono); text-transform: uppercase; letter-spacing: .09em; color: var(--muted); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* ---- top bar + tabs ---- */
+.bar { position: sticky; top: 0; z-index: 20; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 10px 16px; background: var(--bg); border-bottom: 1px solid var(--line); }
+.brand { font: 700 15px var(--f-display); display: flex; gap: 8px; align-items: center; margin-right: 10px; }
+.brand i { width: 12px; height: 12px; background: var(--accent); display: inline-block; border-radius: var(--radius); }
+.nav { display: flex; gap: 2px; flex-wrap: wrap; }
+.nav button { background: none; border: 0; padding: 6px 12px; color: var(--muted); border-radius: var(--radius); font-weight: 500; }
+.nav button[aria-selected="true"] { color: var(--ink); background: var(--surface2); }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 18px 16px 48px; }
+.head { margin: 0 0 16px; }
+.head h1 { font-size: clamp(1.4rem, 3vw, 1.9rem); font-weight: 700; }
+.sub { color: var(--muted); margin: 6px 0 0; max-width: 70ch; }
+.view[hidden] { display: none; }
+
+/* ---- controls ---- */
+.btn { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 6px 12px; font-size: 14px; font-weight: 500; white-space: nowrap; }
+.btn:hover { border-color: var(--ink); }
+.btn.pri { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+.btn.sm { padding: 3px 9px; font-size: 13px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; flex-wrap: wrap; }
+.seg button { border: 0; background: var(--surface); padding: 6px 12px; font-size: 13px; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.search { padding: 7px 10px; border: 1px solid var(--line); background: var(--surface); border-radius: var(--radius); min-width: min(100%, 220px); }
+.pill { font: 500 10.5px var(--f-mono); text-transform: uppercase; letter-spacing: .06em; padding: 1px 6px; border-radius: 2px; background: var(--surface2); color: var(--muted); white-space: nowrap; display: inline-block; }
+.pill.ok { background: var(--ok-soft); color: var(--ok); } .pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.bad { background: var(--bad-soft); color: var(--bad); } .pill.info { background: var(--info-soft); color: var(--info); }
+.pill.acc { background: var(--accent-soft); color: var(--accent); }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 0 0 14px; }
+.banner { border: 1px solid var(--line); border-left: 4px solid var(--info); background: var(--surface); padding: 8px 12px; border-radius: var(--radius); font-size: 14px; margin: 0 0 14px; }
+.banner.warn { border-left-color: var(--warn); } .banner.ok { border-left-color: var(--ok); } .banner.bad { border-left-color: var(--bad); }
+.callout { border-left: 4px solid var(--info); background: var(--info-soft); padding: 10px 14px; border-radius: var(--radius); margin: 12px 0; font-size: 14.5px; }
+.callout.warn { border-color: var(--warn); background: var(--warn-soft); } .callout.tip { border-color: var(--ok); background: var(--ok-soft); } .callout.danger { border-color: var(--bad); background: var(--bad-soft); }
+
+/* ---- panes, tiles, tables, code ---- */
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; align-items: start; }
+.pane { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 16px; box-shadow: var(--shadow); min-width: 0; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 0 0 16px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; }
+.tile .k { font: 500 11px var(--f-mono); text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+.tile .v { font: 600 1.3rem var(--f-display); font-variant-numeric: tabular-nums; margin-top: 2px; }
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+th { background: var(--surface2); font-weight: 600; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+code { font-family: var(--f-mono); font-size: 13px; background: var(--surface2); padding: 1px 5px; border-radius: 3px; }
+.codeblock { background: var(--code-bg); color: var(--code-ink); border-radius: var(--radius-lg); margin: 10px 0; overflow: hidden; }
+.codeblock pre { margin: 0; padding: 12px; overflow-x: auto; font: 13px/1.5 var(--f-mono); }
+
+/* ---- diagram ---- */
+.stage { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-lg); overflow-x: auto; }
+.stage svg { display: block; width: 100%; height: auto; }
+.zone rect { fill: var(--surface); stroke: var(--line); stroke-width: 1.2; stroke-dasharray: 5 4; }
+.zone.t-accent rect { fill: var(--accent-soft); } .zone.t-info rect { fill: var(--info-soft); }
+.zone.t-ok rect { fill: var(--ok-soft); } .zone.t-warn rect { fill: var(--warn-soft); } .zone.t-bad rect { fill: var(--bad-soft); }
+.zone text { font: 500 11px var(--f-mono); letter-spacing: .08em; text-transform: uppercase; fill: var(--muted); }
+.node { cursor: pointer; transition: opacity .15s; }
+.node rect.box { fill: var(--surface); stroke: var(--line); stroke-width: 1.2; }
+.node:hover rect.box, .node:focus-visible rect.box { stroke: var(--accent); }
+.node.sel rect.box { stroke: var(--accent); stroke-width: 2.4; fill: var(--accent-soft); }
+.node rect.ico { fill: var(--accent-soft); } .node.sel rect.ico { fill: var(--surface); }
+.node text.i { font: 700 11px var(--f-mono); fill: var(--accent); text-anchor: middle; }
+.node text.n { font: 600 13px var(--f-body); fill: var(--ink); }
+.node text.s { font: 400 10.5px var(--f-mono); fill: var(--muted); }
+.edge path { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-linejoin: round; }
+.edge.dashed path { stroke-dasharray: 6 4; }
+.edge text { font: 500 10.5px var(--f-mono); fill: var(--muted); text-anchor: middle; paint-order: stroke; stroke: var(--bg); stroke-width: 5px; stroke-linejoin: round; }
+.edge.hi path { stroke: var(--accent); stroke-width: 2.4; }
+.edge.hi text { fill: var(--accent); }
+svg.focus .node:not(.rel), svg.focus .edge:not(.hi) { opacity: .28; }
+.edge.step path { stroke: var(--accent); stroke-width: 3; stroke-dasharray: 8 6; animation: flow .7s linear infinite; }
+@keyframes flow { to { stroke-dashoffset: -14; } }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); margin-top: 10px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 22px; height: 0; border-top: 2px solid var(--muted); display: inline-block; }
+.legend i.d { border-top-style: dashed; }
+.detail h2 { font-size: 1.15rem; margin: 6px 0 4px; }
+.detail dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 10px 0; font-size: 13.5px; }
+.detail dt { font: 500 11px var(--f-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding-top: 2px; }
+.detail dd { margin: 0; }
+.links { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 6px; }
+.links button { width: 100%; text-align: left; background: var(--surface2); border: 1px solid transparent; border-radius: var(--radius); padding: 6px 10px; font-size: 13.5px; }
+.links button:hover { border-color: var(--accent); }
+.links .lbl { font: 400 11px var(--f-mono); color: var(--muted); display: block; }
+.stepcap { font-size: 14px; min-height: 2.9em; margin: 8px 0 0; }
+
+@media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); } .stage svg { min-width: var(--minw, 760px); } }
+@media (prefers-reduced-motion: reduce) { .edge.step path { animation: none; } .node { transition: none; } }
+
+/* ---- guide content ---- */
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin: 0 0 16px; }
+.cols.three { grid-template-columns: repeat(3, minmax(0, 1fr)); } @media (max-width: 900px) { .cols.three { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); } }
+.cols .pane h3 { margin: 0 0 6px; font-size: 1.02rem; }
+.cols .pane p, .pane p { margin: 6px 0; }
+.pane ul { margin: 6px 0; padding-left: 20px; } .pane li { margin: 3px 0; }
+.section-h { font: 600 1.2rem var(--f-display); margin: 26px 0 10px; }
+.lead { font-size: 1.05rem; max-width: 74ch; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: 14px; margin: 8px 0; }
+.kv dt { font: 500 11px var(--f-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding-top: 3px; } .kv dd { margin: 0; }
+.steps { counter-reset: s; list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 8px; }
+.steps li { counter-increment: s; display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: start; }
+.steps li::before { content: counter(s); width: 24px; height: 24px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); font: 700 12px var(--f-mono); display: grid; place-items: center; }
+.tag { display: inline-block; font: 500 11px var(--f-mono); background: var(--surface2); border-radius: 3px; padding: 1px 6px; margin: 0 4px 4px 0; }
+.repo { display: none; } .repo.on { display: inline-flex; }
+@media (max-width: 600px) { .kv { grid-template-columns: 1fr; } }
+/* ==== Valhalla skin ==== */
+body { background-image: radial-gradient(90% 420px at 50% 0, color-mix(in srgb, var(--accent) 15%, transparent), transparent 72%); background-repeat: no-repeat; }
+h1, h2, h3 { font-weight: 600; letter-spacing: .04em; font-variant-numeric: lining-nums; }
+.head h1 { font-weight: 500; font-size: clamp(1.6rem, 3.4vw, 2.5rem); text-transform: uppercase; letter-spacing: .12em; color: var(--accent); }
+.eyebrow, .tile .k, .pill, th { font-family: var(--f-body); letter-spacing: .16em; }
+.bar { background: color-mix(in srgb, var(--bg) 94%, transparent); }
+.brand { font: 600 16px var(--f-display); letter-spacing: .16em; text-transform: uppercase; }
+.brand i { width: 20px; height: 22px; border-radius: 0; background: var(--accent); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 108'%3E%3Cpath d='M 44.5 20 L 55.5 20 L 56.5 74 L 50 92 L 43.5 74 Z M 50 4 L 43 12 C 33 13 21 10 9 3 C 3 16 6 31 17 42 C 23 30 33 23 44.5 22 L 50 22 Z M 50 4 L 57 12 C 67 13 79 10 91 3 C 97 16 94 31 83 42 C 77 30 67 23 55.5 22 L 50 22 Z M 22 92 C 33 100 44 101.5 50 97.5 C 56 101.5 67 100 78 92 C 68 105 57 106 50 102 C 43 106 32 105 22 92 Z'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 108'%3E%3Cpath d='M 44.5 20 L 55.5 20 L 56.5 74 L 50 92 L 43.5 74 Z M 50 4 L 43 12 C 33 13 21 10 9 3 C 3 16 6 31 17 42 C 23 30 33 23 44.5 22 L 50 22 Z M 50 4 L 57 12 C 67 13 79 10 91 3 C 97 16 94 31 83 42 C 77 30 67 23 55.5 22 L 50 22 Z M 22 92 C 33 100 44 101.5 50 97.5 C 56 101.5 67 100 78 92 C 68 105 57 106 50 102 C 43 106 32 105 22 92 Z'/%3E%3C/svg%3E") center / contain no-repeat; }
+.nav button { text-transform: uppercase; letter-spacing: .16em; font-size: 12px; border-radius: 0; }
+.nav button[aria-selected="true"] { background: none; color: var(--ink); box-shadow: inset 0 -2px 0 var(--accent); }
+.btn { text-transform: uppercase; letter-spacing: .12em; font-size: 12px; }
+.btn.sm { font-size: 11px; }
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn.pri:hover { color: var(--accent-ink); }
+.seg button { text-transform: uppercase; letter-spacing: .1em; font-size: 11.5px; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.pane { box-shadow: none; background: linear-gradient(180deg, color-mix(in srgb, var(--surface2) 70%, var(--surface)), var(--surface)); border-image: linear-gradient(135deg, var(--accent), var(--line) 14px, var(--line) calc(100% - 14px), var(--accent)) 1; }
+.tile { background: linear-gradient(180deg, color-mix(in srgb, var(--surface2) 70%, var(--surface)), var(--surface)); }
+.tile .v { font-size: 1.55rem; font-variant-numeric: lining-nums tabular-nums; }
+th { background: transparent; font-weight: 500; font-size: 11px; text-transform: uppercase; color: var(--muted); }
+.stage { background: color-mix(in srgb, var(--surface) 55%, var(--bg)); }
+.zone rect, .node rect.box, .node rect.ico { rx: 0; ry: 0; }
+.zone text { font-family: var(--f-body); letter-spacing: .18em; }
+.node text.i { font-family: var(--f-display); font-size: 13px; }
+.node.sel rect.box { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 60%, transparent)); }
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <span class="brand"><i></i><span id="brand">Example system</span></span>
+  <nav class="nav" id="nav" role="tablist" aria-label="Views"></nav>
+  <span class="grow"></span>
+  <button class="btn sm" id="themeBtn" title="Switch theme">Theme: system</button>
+</header>
+
+<main class="wrap">
+  <div class="head">
+    <div class="eyebrow" id="eyebrow">Guide</div>
+    <h1 id="title">Homelab Hub Field Guide</h1>
+    <p class="sub" id="subtitle"></p>
+  </div>
+
+  <!-- ============ Overview ============ -->
+  <section class="view" id="v-overview">
+    <p class="lead">Homelab Hub is a self-hosted control panel for a small home lab, and <b>Docs</b> is its companion knowledge base. Together
+    they run on two cheap machines: a Raspberry Pi 4 and a small container on a Proxmox server. This guide explains what each part does, how
+    the parts are connected, who is allowed to reach what, and how to run your own copy.</p>
+    <div class="tiles">
+      <div class="tile"><div class="k">Machines</div><div class="v">2</div></div>
+      <div class="tile"><div class="k">Containers</div><div class="v">5</div></div>
+      <div class="tile"><div class="k">Automated tests</div><div class="v">900+</div></div>
+      <div class="tile"><div class="k">Credentials in the repo</div><div class="v">0</div></div>
+      <div class="tile"><div class="k">Runtime calls between the two machines</div><div class="v">0</div></div>
+    </div>
+    <div class="cols">
+      <div class="pane"><h3>The Hub <span class="pill info">private</span></h3>
+        <p>One container on a Raspberry Pi. Only reachable from your home network or your private VPN (Tailscale).</p>
+        <ul><li>A live dashboard of your services, with status lights and host widgets</li>
+        <li>A YAML config you edit in the browser, with validation, a diff before saving and version history</li>
+        <li>Wake-on-LAN and Proxmox power actions that need a typed confirmation and are written to an audit log</li>
+        <li>A shared-expenses page, a browser terminal and a Docker manager</li></ul></div>
+      <div class="pane"><h3>Docs <span class="pill info">private editor</span> <span class="pill acc">public pages</span></h3>
+        <p>Four containers in a small Proxmox container (LXC). The editor is private; the pages you choose to publish are public.</p>
+        <ul><li>A Confluence-style page tree with a rich editor, history, diffs and a Trash</li>
+        <li>Interactive web-app pages (HTML or a ZIP) that run in a locked-down sandbox</li>
+        <li>Each page can get its own public hostname, such as <code>notes.example.com</code>, and visitors see only that page</li>
+        <li>The public portfolio is edited here and served from here</li></ul></div>
+    </div>
+    <h2 class="section-h">Principles that shaped the design</h2>
+    <div class="cols three">
+      <div class="pane"><h3>Editors are never on the internet</h3><p>The two apps that can change things have no public route at all. The public side is a separate, much simpler program.</p></div>
+      <div class="pane"><h3>The public side has nothing to steal</h3><p>It has no database driver, no credentials and no admin routes. It only reads a sanitised snapshot file. The build fails if that ever changes.</p></div>
+      <div class="pane"><h3>Two machines, no runtime link</h3><p>The Pi and the Docs container never call each other. The Hub only <em>links</em> to Docs; your browser does the navigating. Either side can be off without breaking the other.</p></div>
+      <div class="pane"><h3>Dangerous actions need intent</h3><p>Power actions use a one-time token bound to your session and, for destructive ones, a typed confirmation. Everything is audited.</p></div>
+      <div class="pane"><h3>Boring, testable technology</h3><p>Java 17 with Spring Boot, plain JDBC, SQLite and React. Hundreds of unit, integration and real-browser tests run before anything is deployed.</p></div>
+      <div class="pane"><h3>Small enough for a Pi</h3><p>The Hub uses roughly a quarter of a gigabyte of memory. Settings are explicit because Pi kernels often ignore container memory limits.</p></div>
+    </div>
+    <div class="callout tip"><b>How to read this guide.</b> Start with <em>Architecture</em> and click a box. Use <em>Walk through</em> to watch a request travel. The other tabs explain the features, the security model and how to run it yourself.</div>
+  </section>
+
+  <!-- ============ Architecture ============ -->
+  <section class="view" id="v-diagram" hidden>
+    <div class="toolbar">
+      <div class="seg" id="layers" role="group" aria-label="Layers"></div>
+      <input class="search" id="q" type="search" placeholder="Find a component…" aria-label="Find a component">
+      <span class="grow"></span>
+      <label class="muted" for="flowSel" style="font-size:13px">Walk through</label>
+      <select class="search" id="flowSel" style="min-width:0"></select>
+      <button class="btn sm" id="prev" aria-label="Previous step">◀</button>
+      <button class="btn sm pri" id="play">▶ Play</button>
+      <button class="btn sm" id="next" aria-label="Next step">▶|</button>
+    </div>
+    <div class="layout">
+      <div>
+        <div class="stage"><svg id="svg" role="img" aria-label="System architecture diagram"></svg></div>
+        <p class="stepcap" id="stepcap" aria-live="polite"></p>
+        <div class="legend">
+          <span><i></i> request / data</span><span><i class="d"></i> async / optional</span>
+          <span>Click a box for details · hover to trace its connections · Esc clears</span>
+        </div>
+      </div>
+      <aside class="pane detail" id="detail" aria-live="polite"></aside>
+    </div>
+    <div class="callout">Container names (such as <code>hub-internal</code>) are shown under each box so you can match the diagram to the repository and to <code>docker ps</code>.</div>
+  </section>
+
+  <!-- ============ Hub ============ -->
+  <section class="view" id="v-hub" hidden>
+    <p class="lead">The Hub is the part you open every day. Everything below lives in one container (<code>hub-internal</code>) on the Pi.</p>
+    <div class="cols">
+      <div class="pane"><h3>Dashboard</h3><p>Groups of service tiles with live status (TCP, HTTP or ping checks). A status that cannot be determined shows as <em>unknown</em>, never as an outage. Optional widgets show host CPU, memory, disk, temperature, uptime and network, plus Proxmox resources and a web-search box. Updates stream in live; <kbd>Ctrl</kbd>+<kbd>K</kbd> opens a search palette for services, actions and pages.</p></div>
+      <div class="pane"><h3>Config editor</h3><p>The whole dashboard is one text file, <code>dashboard.yaml</code>. The editor validates it on the server, marks the exact line of every error, shows a diff before saving and keeps a version history. If someone edits the file over SSH while you have it open you get a conflict dialog. A broken file never takes the dashboard down: the last good version keeps being served.</p></div>
+      <div class="pane"><h3>Power actions</h3><p>Wake-on-LAN, and Proxmox start, stop and shutdown for guests and hosts. An action first asks the server what it would affect, then needs a one-time token (valid 30 seconds, bound to your session). Destructive ones need the guest name typed. The UI then follows the real Proxmox task to the end, so it shows the actual result, not just "sent". Every attempt goes to an audit log.</p></div>
+      <div class="pane"><h3>Budget</h3><p>Shared monthly expenses for a household. People, expenses, equal splits in exact integer paise, part payments, balances that carry over, recurring entries and a "who pays whom" list netted across everyone. Export a PDF for a month or any date range. The page loads only when opened and runs no background job.</p></div>
+      <div class="pane"><h3>Terminal</h3><p>A shell in the browser, including in the installed phone app. It is off by default. Turning it on needs a login, then asks for your password again for every session. A one-time ticket opens an SSH connection to a pinned host as a dedicated low-privilege user. Idle and maximum-time limits apply.</p></div>
+      <div class="pane"><h3>Docker manager</h3><p>List, start, stop, restart, update and remove containers on several hosts over SSH, tail and search logs live, create and deploy compose stacks with versioned history, run a container from a form that shows the exact command, and clean up unused images. Protected containers and the Hub itself are refused.</p></div>
+      <div class="pane"><h3>Installable phone app</h3><p>Served over Tailscale HTTPS the dashboard installs as a progressive web app. Its service worker caches only fingerprinted assets and an offline page, never API responses.</p></div>
+      <div class="pane"><h3>Portfolio card</h3><p>The portfolio used to be edited here. It now lives in Docs; the dashboard shows a card with two plain links, <em>Edit in Docs</em> and <em>Open public site</em>. The Hub makes no request to the Docs machine.</p></div>
+    </div>
+    <h2 class="section-h">Stack</h2>
+    <p><span class="tag">Java 17</span><span class="tag">Spring Boot 3.5</span><span class="tag">plain JDBC</span><span class="tag">Flyway</span><span class="tag">SQLite (WAL)</span><span class="tag">React 19</span><span class="tag">Vite</span><span class="tag">TypeScript</span><span class="tag">CodeMirror</span><span class="tag">xterm.js</span><span class="tag">Docker</span><span class="tag">Playwright</span></p>
+  </section>
+
+  <!-- ============ Docs ============ -->
+  <section class="view" id="v-docs" hidden>
+    <p class="lead">Docs is a small wiki for notes, runbooks and interactive pages. It is a separate application with its own login, its own database and its own machine.</p>
+    <div class="cols">
+      <div class="pane"><h3>Write</h3><p>A page tree you can drag to reorder, with <em>Move to…</em> for keyboard and phone, duplicate, and a 30-day Trash. The editor handles headings, lists, checklists, tables, images, code with highlighting, callouts, collapsible sections, attachments, links between pages and <b>Mermaid</b> diagrams.</p></div>
+      <div class="pane"><h3>Web-app pages</h3><p>Upload an <code>index.html</code> or a ZIP and it runs as an interactive page in a sandboxed frame. It cannot see Docs, its cookies or its API. The frame can load files from its own bundle, plus the CDNs you tick for that page. This very guide is such a page.</p></div>
+      <div class="pane"><h3>Publish</h3><p>Pages are private until you give one a public hostname and press Publish. A visitor on that hostname sees exactly that one page, read-only, marked <code>noindex</code>. A hostname the page server does not know gets an empty 404, and once a page is unpublished its address has no route at all. Links to unpublished pages become plain text.</p></div>
+      <div class="pane"><h3>History</h3><p>Every save, publish, restore and move is a version. Compare two versions with a diff and restore any of them into the draft. A draft change never reaches the public page until you publish.</p></div>
+      <div class="pane"><h3>Portfolio</h3><p>A one-page portfolio with a filter panel: pick skills and the whole page narrows to matching roles, projects and homelab entries. It is edited at <code>#/portfolio</code> inside Docs, with field-level validation and optimistic locking, and published automatically to its own public hostname.</p></div>
+      <div class="pane"><h3>Backups</h3><p>The database is copied nightly (14 kept). Images and attachments live in a content-addressed blob folder that the copy does not include, so the whole container is also backed up from Proxmox.</p></div>
+    </div>
+    <h2 class="section-h">How a page goes public</h2>
+    <ol class="steps">
+      <li><span>You press <b>Publish</b> and choose a hostname. The editor records a published version in its database.</span></li>
+      <li><span>The publisher copies the needed files, writes the page's JSON, and writes a host-to-page map <em>last</em>, with an atomic rename. That last write is what makes the page live, so a crash half-way can never expose a half-published page.</span></li>
+      <li><span>The page server notices the map changed and reloads it. It only has read access to that folder.</span></li>
+      <li><span>With <b>route automation</b> on, the editor then calls the Cloudflare API to add that hostname's tunnel rule and a proxied DNS record. The call is queued and retried, so a Cloudflare problem shows as a status with a <b>Retry</b> button and never breaks the publish. Unpublish, delete or rename removes both again. There is no wildcard.</span></li>
+      <li><span>A visitor's request arrives through the Cloudflare tunnel. The server picks the page by the <code>Host</code> header and serves it, or an empty 404.</span></li>
+    </ol>
+  </section>
+
+  <!-- ============ Security ============ -->
+  <section class="view" id="v-security" hidden>
+    <p class="lead">The goal: a mistake or compromise on the public side must not be able to reach the powerful side, and a mistake in the browser must not be able to switch a server off by accident.</p>
+    <div class="tablewrap"><table><thead><tr><th>Area</th><th>What protects it</th></tr></thead><tbody>
+      <tr><td>Public surface</td><td>Separate containers with no database driver, no Proxmox client and no Spring Security, enforced by a build rule. They read a sanitised snapshot (size-capped, last good copy kept). The public JavaScript bundle is scanned at build time for leaked admin code. Non-root user, read-only filesystem, all Linux capabilities dropped, <code>no-new-privileges</code>.</td></tr>
+      <tr><td>Network exposure</td><td>The editors have no public route. The Docs tunnel's compose network contains only the tunnel connector and the two public servers, so even a wrong tunnel rule cannot reach an editor. The public servers publish no host port. The editor's only outbound call is the optional route automation to the Cloudflare API; the tunnel connector still has no network path to it.</td></tr>
+      <tr><td>Cloudflare automation</td><td>Off by default, with a dry-run mode that only logs. The API token is limited to Tunnel: Edit and DNS: Edit on one account and zone and lives only in the editor's <code>.env</code>. Hostnames must be one lowercase label under the zone; wildcards, the main domain, names starting with <code>_</code> and a reserved list (mail, vpn, other apps) are refused. The tunnel config is read, merged and written back under one lock so every other rule stays, with the 404 catch-all last. Only DNS records carrying a <code>managed-by</code> comment are ever deleted. Every change is in the audit log.</td></tr>
+      <tr><td>Login</td><td>One bcrypt-hashed password (cost 12), cookie <code>HttpOnly; SameSite=Strict</code>. No default password. Failed logins are rate-limited per client with an escalating lockout, plus a global cap.</td></tr>
+      <tr><td>CSRF and origin</td><td>Cookie-to-header CSRF token on every state change, and a <code>Host</code> allow-list against DNS rebinding.</td></tr>
+      <tr><td>Content security</td><td>Strict CSP, <code>nosniff</code>, self-hosted fonts and icons, link schemes checked, external links use <code>noopener noreferrer</code>.</td></tr>
+      <tr><td>Power actions</td><td>Prepare then confirm with a 30-second one-time token bound to one action and one session. Typed confirmation for destructive actions. Per-target lock. Audit log.</td></tr>
+      <tr><td>Proxmox access</td><td>TLS certificate pinning by default, short timeouts, no redirects, and the API token never appears in logs or errors.</td></tr>
+      <tr><td>Secrets</td><td>Only as <code>${secret:NAME}</code> references, resolved from a mode-600 file or the environment. A plaintext credential in the YAML is a validation error. Nothing secret is committed to the repository.</td></tr>
+      <tr><td>Terminal and Docker</td><td>Off unless enabled, and they refuse to run without a login. Hosts must be declared in the config. SSH host keys are pinned, keys are public-key only and restricted to the Hub machine, commands are built on the server from a fixed set of verbs with every value validated and quoted.</td></tr>
+      <tr><td>Docs sandbox</td><td>Page bodies are whitelisted JSON, never HTML. Web apps run in <code>sandbox="allow-scripts"</code> with no same-origin access and a CSP that blocks outside requests. ZIP uploads are checked for path traversal, symlinks, bombs and file types.</td></tr>
+    </tbody></table></div>
+    <div class="callout warn"><b>Known limits, stated plainly.</b> Legacy Wake-on-LAN URLs stay open (no login) so old callers keep working; cross-site browser requests are refused and every call is audited. Over plain HTTP on the LAN the session cookie cannot be <code>Secure</code>; use Tailscale HTTPS for that. Anyone with the Hub password can open a shell on the Pi once the Terminal is enabled; that is an accepted risk of the feature.</div>
+  </section>
+
+  <!-- ============ Run it ============ -->
+  <section class="view" id="v-run" hidden>
+    <p class="lead">You need a Raspberry Pi 4 (or any Linux box with Docker) for the Hub, and optionally a small Proxmox container with Docker for Docs. Nothing here needs a cloud account except Cloudflare, and only if you want public pages.</p>
+    <div class="pane" style="margin-bottom:14px"><dl class="kv">
+      <dt>Source</dt><dd><span id="repoText">Published on GitHub (link appears here once the repository is public).</span> <a class="btn sm pri repo" id="repoLink" href="#">Open the repository</a></dd>
+      <dt>Hub machine</dt><dd>Raspberry Pi 4 (arm64) with Docker, about 1 GB free memory</dd>
+      <dt>Docs machine</dt><dd>A Proxmox LXC (Debian, nesting and keyctl enabled, TUN device if you use Tailscale), about 2 GB memory</dd>
+      <dt>Build</dt><dd>JDK 17, Maven, Node 22 on a development machine (or build on the target)</dd>
+    </dl></div>
+    <h2 class="section-h">Hub on the Pi</h2>
+    <ol class="steps">
+      <li><span>Clone the repository and run <code>scripts/build-all.sh</code>. It builds the web bundles, runs every test, and packages the jars.</span></li>
+      <li><span>Create the password hash with the built-in <code>hash-password</code> command, copy <code>deploy/.env.example</code> to <code>deploy/.env</code> and fill it in. Create <code>secrets.env</code> for tokens (mode 600).</span></li>
+      <li><span>Pin your Proxmox certificate with the <code>fingerprint</code> command and compare it with what the Proxmox UI shows.</span></li>
+      <li><span>Start it: <code>docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build</code>. Open <code>http://&lt;pi&gt;:3010</code>, sign in and edit <code>dashboard.yaml</code> in the Config page.</span></li>
+    </ol>
+    <h2 class="section-h">Docs on the LXC</h2>
+    <ol class="steps">
+      <li><span>Create the LXC and install Docker. Optionally install Tailscale and expose the editor with <code>tailscale serve</code>.</span></li>
+      <li><span>Create a Cloudflare tunnel for Docs. Add a route for the portfolio hostname pointing at the portfolio server. Routes for published pages are added for you by route automation (next steps), so no wildcard is needed. The first matching rule wins and the last rule must stay the 404 catch-all.</span></li>
+      <li><span>Copy <code>deploy/docs/.env.example</code> to <code>deploy/docs/.env</code> and fill in the password hash and tunnel token.</span></li>
+      <li><span><b>Optional, route automation:</b> create a Cloudflare API token limited to <em>Cloudflare Tunnel: Edit</em> and <em>DNS: Edit</em> for your account and zone, and set the <code>DOCS_CF_*</code> values in <code>.env</code> (account, zone, tunnel, zone name, token). Start with <code>DOCS_CF_DRY_RUN=true</code> to read the planned calls in the log, then switch to <code>DOCS_CF_AUTOMATION_ENABLED=true</code> with dry run off. Publishing a page now creates its route, and a start-up pass fixes any drift.</span></li>
+      <li><span>Start it: <code>docker compose -f deploy/docs/docker-compose.yml --env-file deploy/docs/.env up -d --build</code>. No container depends on another, so each one starts and restarts alone.</span></li>
+      <li><span>Add a <code>docs:</code> block to the Hub's <code>dashboard.yaml</code> so the dashboard links to it.</span></li>
+    </ol>
+    <div class="codeblock"><pre># try everything locally, no Pi or Proxmox needed (mock Proxmox, mock SSH, mock Docker)
+scripts/build-all.sh
+scripts/e2e.sh          # starts both stacks and runs the real-browser tests</pre></div>
+    <p class="muted">The step-by-step guide is in the repository at <code>docs/docs-setup-guide.md</code>, and the design history in <code>docs/design-history/</code>.</p>
+    <h2 class="section-h">Repository map</h2>
+    <div class="tablewrap"><table><thead><tr><th>Folder</th><th>What it is</th></tr></thead><tbody>
+      <tr><td><code>hub-internal/</code></td><td>The Hub app (dashboard, config, actions, budget, terminal, Docker)</td></tr>
+      <tr><td><code>hub-public/</code></td><td>The read-only portfolio server</td></tr>
+      <tr><td><code>hub-snapshot/</code></td><td>The tiny shared data format for snapshots (no Spring, no database)</td></tr>
+      <tr><td><code>hub-auth/</code></td><td>The login, rate limiter, CSRF and host checks shared by both private apps</td></tr>
+      <tr><td><code>docs-internal/</code></td><td>The Docs editor app, which also hosts the portfolio editor</td></tr>
+      <tr><td><code>docs-public/</code></td><td>The Docs public page server</td></tr>
+      <tr><td><code>web/</code></td><td>All front ends (React) and the browser tests</td></tr>
+      <tr><td><code>deploy/</code></td><td>Dockerfiles and compose files for the Pi and for the Docs LXC</td></tr>
+      <tr><td><code>tools/</code></td><td>Mock Proxmox, mock SSH and mock Docker for tests, plus one-off import tools</td></tr>
+    </tbody></table></div>
+  </section>
+
+  <!-- ============ Who can reach what ============ -->
+  <section class="view" id="v-reach" hidden>
+    <div class="toolbar">
+      <div class="seg" id="netf" role="group" aria-label="Filter by network">
+        <button aria-pressed="true" data-f="all">All</button><button aria-pressed="false" data-f="net-inet">Internet</button><button aria-pressed="false" data-f="net-lan">Home network</button><button aria-pressed="false" data-f="net-ts">Tailscale</button>
+      </div>
+      <span class="muted" id="netcount"></span>
+    </div>
+    <div class="tablewrap"><table><thead><tr><th>From</th><th>Address</th><th>Via</th><th>Lands on</th><th>What you get</th></tr></thead><tbody id="reachbody">
+      <tr data-net="net-inet"><td>Internet</td><td>The portfolio's hostname</td><td>Cloudflare, the Docs tunnel, the tunnel connector, the private <code>edge</code> network</td><td><b>Portfolio server</b> (<code>hub-public:3011</code>, no host port)</td><td>The read-only portfolio</td></tr>
+      <tr data-net="net-inet"><td>Internet</td><td>A published page's hostname, such as <code>page.your-domain.com</code></td><td>Its own DNS record and tunnel rule (created on Publish), then the same tunnel and network</td><td><b>Docs page server</b> (<code>docs-public:3011</code>, no host port)</td><td>One page per hostname; anything else is an empty 404</td></tr>
+      <tr data-net="net-lan"><td>Home network</td><td><code>http://&lt;pi&gt;:3010</code></td><td>Direct, the container uses host networking</td><td><b>Hub dashboard app</b></td><td>Dashboard, actions, config, budget, terminal, Docker (login)</td></tr>
+      <tr data-net="net-ts"><td>Tailscale</td><td>The Pi's tailnet address</td><td><code>tailscale serve</code> (HTTPS, optional)</td><td><b>Hub dashboard app</b></td><td>The same dashboard, plus the installable phone app</td></tr>
+      <tr data-net="net-lan"><td>Home network</td><td><code>http://&lt;lxc-ip&gt;:3020</code></td><td>Direct; the Proxmox firewall allows only your LAN</td><td><b>Docs editor app</b></td><td>The Docs and portfolio editor (login)</td></tr>
+      <tr data-net="net-ts"><td>Tailscale</td><td><code>https://docs.&lt;tailnet&gt;.ts.net</code></td><td><code>tailscale serve</code> inside the LXC</td><td><b>Docs editor app</b></td><td>The same editor; allows Secure cookies</td></tr>
+      <tr data-net="net-lan net-ts"><td>Home network, Tailscale</td><td>The dashboard's <b>Docs</b> and <b>Portfolio</b> links</td><td>Browser navigation only</td><td><b>Docs editor app</b></td><td>No connection between the Pi and the LXC</td></tr>
+    </tbody></table></div>
+    <div class="callout tip"><b>The editors are never on the internet.</b> Both private apps are reachable only from the home network and Tailscale. The only things the internet can touch are the two read-only public servers. The one connection the other way is the editor calling the Cloudflare API, outbound only, when route automation is on.</div>
+    <div class="callout"><b>Independence.</b> Stop the Docs editor and the public portfolio and published pages keep working from their last snapshot. Turn the whole Docs container off and the Pi's dashboard is unaffected. Turn the Pi off and Docs is unaffected.</div>
+  </section>
+
+  <!-- ============ Components ============ -->
+  <section class="view" id="v-table" hidden>
+    <div class="toolbar"><span class="muted" id="count"></span></div>
+    <div class="tablewrap"><table id="tbl"></table></div>
+  </section>
+</main>
+
+
+<script>
+/* ============================ 1. EDIT THIS: the content ============================
+   Coordinates live on a virtual canvas (VIEW.w x VIEW.h); the SVG scales to the width available.
+   Nodes are NW x NH (156 x 54). Leave ~40px between nodes so edge labels fit. A node's `zone` is only a grouping label
+   for the table; zones are drawn from their own x/y/w/h. `layer` is optional: nodes/edges with a layer can be toggled. */
+const DATA = {
+  brand: "Homelab Hub",
+  eyebrow: "A complete guide",
+  title: "Homelab Hub Field Guide",
+  subtitle: "A self-hosted home lab control panel and its companion knowledge base: what each part does, how they connect, who can reach what, and how to run your own.",
+  view: { w: 1180, h: 890 },
+  zones: [
+    { id: "net", label: "Public internet", x: 20, y: 40, w: 200, h: 290, tone: "warn" },
+    { id: "trusted", label: "Home network + Tailscale", x: 20, y: 390, w: 200, h: 140, tone: "ok" },
+    { id: "pi", label: "Raspberry Pi 4 (Docker)", x: 260, y: 40, w: 900, h: 190, tone: "" },
+    { id: "pve", label: "Proxmox server", x: 260, y: 260, w: 900, h: 600, tone: "" },
+    { id: "lxc", label: "Docs container (LXC, Docker compose)", x: 276, y: 380, w: 868, h: 460, tone: "info" },
+  ],
+  layers: [{ id: "stores", label: "Data stores" }, { id: "ts", label: "Tailscale" }, { id: "px", label: "Proxmox API" }],
+  nodes: [
+    { id: "visitor", zone: "net", ico: "VS", label: "Public visitor", sub: "anyone, no login", x: 37, y: 90,
+      desc: "A person on the public internet. They can only ever see something you chose to publish, read-only. A hostname that is not published has no route, or gets a plain, empty 404, and every response says noindex.",
+      facts: [["Sees", "one page per hostname, or the portfolio"], ["Else", "404, empty body"], ["Header", "X-Robots-Tag: noindex, nofollow"]] },
+    { id: "cf", zone: "net", ico: "CF", label: "Cloudflare", sub: "DNS + one tunnel", x: 37, y: 230,
+      desc: "Terminates TLS and routes by hostname through one tunnel into the Docs container. There is no wildcard: each published page has its own proxied DNS record and tunnel rule, created and removed by the Docs editor through the Cloudflare API. Routes are matched in order, the portfolio's first, and the last rule is a 404 catch-all.",
+      facts: [["Per-page route", "page hostname to the page server, added on Publish, removed on Unpublish"], ["DNS", "one proxied CNAME to the tunnel per page, commented managed-by"], ["Specific route", "portfolio hostname to the portfolio server"], ["Order", "first match wins; the 404 catch-all stays last"], ["Wildcard", "none"]] },
+    { id: "browser", zone: "trusted", ico: "YB", label: "You", sub: "browser or phone app", x: 37, y: 430,
+      desc: "You, at home or connected over Tailscale. This is the only way to reach the private apps. The dashboard only links to Docs: your browser navigates, the Pi never talks to the Docs container.",
+      facts: [["Hub", "http://<pi>:3010"], ["Docs (home)", "http://<lxc-ip>:3020"], ["Docs (Tailscale)", "https://docs.<tailnet>.ts.net"]] },
+
+    { id: "hubint", zone: "pi", ico: "HI", label: "Hub dashboard app", sub: "hub-internal", x: 300, y: 90,
+      desc: "The Hub: dashboard, config editor, Proxmox power actions, budget, terminal and Docker manager. Private networks only. It holds the Proxmox token. Host networking is deliberate: Wake-on-LAN needs a broadcast on the real LAN.",
+      facts: [["Port", "3010"], ["Network", "host (for Wake-on-LAN)"], ["Login", "one bcrypt-hashed password"], ["Capability", "NET_RAW, only for ping"], ["Memory", "-Xmx256m"], ["Optional", "Terminal and Docker pages (off by default)"]] },
+    { id: "data", zone: "pi", ico: "DB", label: "Hub data + config", sub: "SQLite + YAML", x: 580, y: 90, layer: "stores",
+      desc: "Everything the Hub knows lives in one data folder: the SQLite database, the dashboard config, the secrets file, icons and nightly backups.",
+      facts: [["Files", "hub.db (WAL), config/dashboard.yaml, secrets.env, backups/"], ["Backups", "nightly, last 14 kept"]] },
+    { id: "pve", zone: "pve", ico: "PV", label: "Proxmox VE API", sub: "port 8006", x: 936, y: 290, layer: "px",
+      desc: "The Hub reads status here and sends confirmed start, stop and shutdown actions. The certificate is pinned by default. The Docs container's firewall blocks it from reaching this port.",
+      facts: [["Called by", "the Hub only"], ["TLS", "pinned fingerprint"], ["Auth", "API token kept in secrets.env"]] },
+
+    { id: "lxccf", zone: "lxc", ico: "TC", label: "Tunnel connector", sub: "docs-cloudflared", x: 292, y: 500,
+      desc: "The Cloudflare tunnel's connector, running inside the Docs container. It shares only the private 'edge' network with the two public servers, so even a wrong tunnel rule cannot reach the editor.",
+      facts: [["Image", "cloudflare/cloudflared"], ["Rules", "portfolio hostname to hub-public:3011; one rule per published page to docs-public:3011; final 404"], ["Network", "edge only"], ["Token", "from the .env file, never in the repo"]] },
+    { id: "hubpublic", zone: "lxc", ico: "PS", label: "Portfolio server", sub: "hub-public", x: 520, y: 430,
+      desc: "Serves the public portfolio. It physically lacks anything dangerous: no database, no Proxmox token, no secrets, no admin routes. It only reads a sanitised JSON snapshot, and keeps the last good copy if a new one is bad.",
+      facts: [["Port", "3011 inside the network, no host port"], ["Serves", "static page + /api/public/portfolio"], ["Mount", "portfolio snapshot, read-only"], ["Hardening", "read-only root, all capabilities dropped"]] },
+    { id: "docspublic", zone: "lxc", ico: "DP", label: "Docs page server", sub: "docs-public", x: 520, y: 590,
+      desc: "Serves exactly one page per hostname, picked by the visitor's Host header. Read-only, no database driver, no host port, so the home network cannot reach it at all.",
+      facts: [["Port", "3011 inside the network, no host port"], ["Lookup", "Host header in the host map"], ["Unknown host", "404, empty body"], ["Hardening", "read-only root, all capabilities dropped"]] },
+    { id: "psnap", zone: "lxc", ico: "SN", label: "Portfolio snapshot", sub: "named volume", x: 760, y: 430,
+      desc: "The hand-off for the portfolio. The editor writes it with a temp file and an atomic rename; the portfolio server only reads it.",
+      facts: [["Writer", "Docs editor app"], ["Reader", "Portfolio server (read-only)"], ["Content", "one JSON file, no images"]] },
+    { id: "dsnap", zone: "lxc", ico: "SN", label: "Docs snapshot", sub: "named volume", x: 760, y: 590,
+      desc: "The hand-off for published pages. The host map is written last and is the switch that makes a page live.",
+      facts: [["Layout", "host map, one JSON per page, files by hash"], ["Editor", "read-write"], ["Page server", "read-only"]] },
+    { id: "docsint", zone: "lxc", ico: "DE", label: "Docs editor app", sub: "docs-internal", x: 950, y: 510,
+      desc: "The Docs editor, its API and login, and the portfolio editor. Port 3020 is published for your home network and for tailscale serve; the Proxmox firewall limits it to the LAN. It is on the private 'backend' network only. When route automation is on it also calls the Cloudflare API, outbound over HTTPS, to add or remove each page's tunnel rule and DNS record.",
+      facts: [["Port", "3020"], ["Network", "backend (private)"], ["Login", "own session cookie, own password hash"], ["Memory", "-Xmx256m"], ["Commands", "import and migrate-portfolio"], ["Outbound", "HTTPS to api.cloudflare.com only, for route automation (off by default)"], ["Cloudflare token", "Tunnel: Edit + DNS: Edit, in its .env only"]] },
+    { id: "ts", zone: "lxc", ico: "TS", label: "Tailscale HTTPS", sub: "tailscale serve", x: 760, y: 720, layer: "ts",
+      desc: "Tailscale runs inside the Docs container (it needs the TUN device) and exposes the editor over HTTPS to your tailnet. With this as the only address you can turn on Secure cookies.",
+      facts: [["Address", "https://docs.<tailnet>.ts.net"], ["Backend", "Docs editor :3020"], ["Needs", "TUN device on the LXC"]] },
+    { id: "docsdata", zone: "lxc", ico: "DB", label: "Docs data + files", sub: "SQLite + blobs", x: 950, y: 710, layer: "stores",
+      desc: "Pages, history, the Trash, the portfolio tables, and content-addressed uploads. The nightly database copy does not include the files folder, so back up the whole container from Proxmox as well.",
+      facts: [["Files", "docs.db, blobs/, backups/"], ["DB backup", "nightly, 14 kept"], ["Full backup", "Proxmox snapshot of the container"]] },
+  ],
+  edges: [
+    { from: "visitor", to: "cf", label: "HTTPS" },
+    { from: "cf", to: "lxccf", label: "tunnel", via: [[127, 350], [252, 350], [252, 527]] },
+    { from: "lxccf", to: "hubpublic", label: "portfolio :3011" },
+    { from: "lxccf", to: "docspublic", label: "pages :3011" },
+    { from: "browser", to: "hubint", label: ":3010", via: [[236, 457], [236, 117]] },
+    { from: "hubint", to: "data", label: "SQL, YAML", layer: "stores" },
+    { from: "hubint", to: "pve", label: "HTTPS pinned", layer: "px" },
+    { from: "browser", to: "docsint", label: "home network :3020", via: [[100, 872], [1138, 872], [1138, 537]] },
+    { from: "browser", to: "ts", label: "tailnet HTTPS", layer: "ts", via: [[160, 747]] },
+    { from: "ts", to: "docsint", label: "serve", layer: "ts" },
+    { from: "docsint", to: "psnap", label: "write" },
+    { from: "psnap", to: "hubpublic", label: "ro mount" },
+    { from: "docsint", to: "dsnap", label: "write" },
+    { from: "dsnap", to: "docspublic", label: "ro mount" },
+    { from: "docsint", to: "docsdata", label: "SQL, files", layer: "stores" },
+    { from: "docsint", to: "cf", label: "route API (HTTPS out)", style: "dashed", via: [[1127, 500], [1127, 245], [252, 245]] },
+  ],
+  flows: [],
+};
+const FLOWS_SRC = [
+  { name: "A page goes public", steps: [
+    ["browser>docsint", "You open the Docs editor from your home network (or over Tailscale) and sign in."],
+    ["docsint>docsdata", "You press Publish and pick a hostname. The editor records a published version in its database."],
+    ["docsint>dsnap", "The publisher copies the missing files, writes the page JSON, then writes the host map last by atomic rename. That last write makes the page live."],
+    ["dsnap>docspublic", "The page server sees the host map change and reloads it. It has a read-only mount and never touches the database."],
+    ["docsint>cf", "If route automation is on, the editor now calls the Cloudflare API: it adds a tunnel rule for the hostname and a proxied DNS record marked as managed by Docs. The call is queued and retried, and a failure shows as a status with a Retry button instead of breaking the publish."],
+    ["visitor>cf", "A visitor opens the page's hostname. It resolves through the DNS record the editor just created; there is no wildcard."],
+    ["cf>lxccf", "Cloudflare sends the request down the tunnel to the connector inside the Docs container."],
+    ["lxccf>docspublic", "The connector forwards to the page server over the private edge network. It matches the Host header and serves that one page; unknown hosts get a 404."]] },
+  { name: "A page goes offline", steps: [
+    ["browser>docsint", "In Docs you press Unpublish (deleting or renaming a published page does the same)."],
+    ["docsint>dsnap", "The editor rewrites the host map without that hostname. The page server stops serving it."],
+    ["docsint>cf", "With route automation on, the editor removes the hostname's tunnel rule and its DNS record. It only ever removes a rule that points at the page server and a record carrying its own managed-by comment, and writes the rest of the tunnel config back unchanged."],
+    ["visitor>cf", "The address no longer has a route, so a visitor gets nothing from Docs."]] },
+  { name: "Visitor opens the portfolio", steps: [
+    ["visitor>cf", "A visitor opens the portfolio's hostname."],
+    ["cf>lxccf", "The portfolio's tunnel rule, the first in the list, sends it into the Docs container."],
+    ["lxccf>hubpublic", "The connector forwards to the portfolio server, which renders the last published snapshot."]] },
+  { name: "Editing the portfolio", steps: [
+    ["browser>docsint", "In Docs you open the Portfolio page and edit a role. The editor validates every field on the server."],
+    ["docsint>docsdata", "The change is saved in SQLite with optimistic locking, so two editors cannot overwrite each other silently."],
+    ["docsint>psnap", "The editor builds the public JSON and writes the snapshot with a temp file and atomic rename."],
+    ["psnap>hubpublic", "The portfolio server reloads, and keeps the last good copy if the new file is bad."]] },
+  { name: "Status and a power action", steps: [
+    ["browser>hubint", "You open the dashboard from home or over Tailscale and sign in."],
+    ["hubint>data", "The layout comes from dashboard.yaml. If the file breaks, the last good version keeps being served."],
+    ["hubint>pve", "The Hub reads Proxmox status. A confirmed action (you type the guest name) calls the Proxmox API with the pinned certificate, then follows the real task to the end."]] },
+];
+for (const n of DATA.nodes) { if (/^(hub|docs)-/.test(n.sub || "")) n.facts = [["Container", n.sub], ...n.facts]; }
+DATA.flows = FLOWS_SRC.map((f) => ({ name: f.name, steps: f.steps.map(([k, t]) => { const [a, b] = k.split(">"); const i = DATA.edges.findIndex((e) => e.from === a && e.to === b); if (i < 0) throw new Error("edge " + k); return [i, t]; }) }));
+/* ============================ 2. ENGINE (usually leave as is) ============================ */
+const NW = 180, NH = 54, $ = (s, r = document) => r.querySelector(s);
+const byId = Object.fromEntries(DATA.nodes.map((n) => [n.id, n]));
+const svg = $("#svg"), NS = "http://www.w3.org/2000/svg";
+const state = { sel: null, hidden: new Set(), q: "", flow: 0, step: -1, timer: null };
+function mk(tag, attrs, parent, text) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; if (parent) parent.appendChild(e); return e; }
+function h(tag, attrs, ...kids) { const e = document.createElement(tag); for (const k in (attrs || {})) { if (k === "class") e.className = attrs[k]; else if (k.startsWith("on")) e[k] = attrs[k]; else e.setAttribute(k, attrs[k]); } for (const c of kids.flat()) if (c != null) e.append(c.nodeType ? c : document.createTextNode(c)); return e; }
+
+function edgeGeom(e) {
+  const a = byId[e.from], b = byId[e.to];
+  const edge = (n, tx, ty) => { // point where the line from the node centre toward (tx,ty) leaves the box
+    const px = n.x + NW / 2, py = n.y + NH / 2, vx = tx - px, vy = ty - py;
+    const t = Math.min((NW / 2 + 3) / (Math.abs(vx) || 1e-6), (NH / 2 + 3) / (Math.abs(vy) || 1e-6));
+    return [px + vx * t, py + vy * t];
+  };
+  const ax = a.x + NW / 2, ay = a.y + NH / 2, bx = b.x + NW / 2, by = b.y + NH / 2;
+  if (e.via && e.via.length) { // waypoints [[x,y],...]: route around nodes instead of cutting across them
+    const first = e.via[0], last = e.via[e.via.length - 1];
+    const [x1, y1] = edge(a, first[0], first[1]), [x2, y2] = edge(b, last[0], last[1]);
+    const pts = [[x1, y1], ...e.via, [x2, y2]];
+    let best = 0, bl = -1; for (let i = 0; i < pts.length - 1; i++) { const l = Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]); if (l > bl) { bl = l; best = i; } }
+    return { d: "M" + pts.map((p) => p.join(",")).join(" L"), lx: (pts[best][0] + pts[best + 1][0]) / 2, ly: (pts[best][1] + pts[best + 1][1]) / 2 - 5 };
+  }
+  const reverse = DATA.edges.some((o) => o.from === e.to && o.to === e.from);
+  const bend = e.bend ?? (reverse ? 16 : 0);
+  const dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy) || 1;
+  const cx = (ax + bx) / 2 + (-dy / len) * bend * 2, cy = (ay + by) / 2 + (dx / len) * bend * 2;
+  const [x1, y1] = edge(a, cx, cy), [x2, y2] = edge(b, cx, cy);
+  const d = bend ? `M${x1},${y1} Q${cx},${cy} ${x2},${y2}` : `M${x1},${y1} L${x2},${y2}`;
+  const lx = bend ? 0.25 * x1 + 0.5 * cx + 0.25 * x2 : (x1 + x2) / 2, ly = (bend ? 0.25 * y1 + 0.5 * cy + 0.25 * y2 : (y1 + y2) / 2) - 5;
+  return { d, lx, ly };
+}
+
+function draw() {
+  svg.replaceChildren();
+  svg.setAttribute("viewBox", `0 0 ${DATA.view.w} ${DATA.view.h}`);
+  svg.style.setProperty("--minw", Math.min(DATA.view.w, 1100) * 0.9 + "px"); // phones scroll the diagram inside its frame instead of shrinking the text
+  const defs = mk("defs", {}, svg);
+  for (const [id, cls] of [["ar", "arrow"], ["arh", "arrow hi"]]) {
+    const m = mk("marker", { id, viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 8, markerHeight: 8, orient: "auto-start-reverse" }, defs);
+    mk("path", { d: "M0,0 L10,5 L0,10 z", class: cls, style: `fill:var(${id === "ar" ? "--muted" : "--accent"})` }, m);
+  }
+  for (const z of DATA.zones) {
+    const g = mk("g", { class: "zone" + (z.tone ? " t-" + z.tone : "") }, svg);
+    mk("rect", { x: z.x, y: z.y, width: z.w, height: z.h, rx: 6 }, g);
+    mk("text", { x: z.x + 12, y: z.y + 20 }, g, z.label);
+  }
+  const edgeEls = DATA.edges.map((e, i) => {
+    const g = mk("g", { class: "edge" + (e.style === "dashed" ? " dashed" : ""), "data-i": i }, svg);
+    const gm = edgeGeom(e);
+    const p = mk("path", { d: gm.d, "marker-end": "url(#ar)" }, g);
+    if (e.both) p.setAttribute("marker-start", "url(#ar)");
+    if (e.label) mk("text", { x: gm.lx, y: gm.ly }, g, e.label);
+    return g;
+  });
+  const nodeEls = DATA.nodes.map((n) => {
+    const g = mk("g", { class: "node", tabindex: 0, role: "button", "data-id": n.id, "aria-label": `${n.label}: ${n.sub || ""}` }, svg);
+    mk("rect", { class: "box", x: n.x, y: n.y, width: NW, height: NH, rx: 5 }, g);
+    mk("rect", { class: "ico", x: n.x + 9, y: n.y + 12, width: 30, height: 30, rx: 4 }, g);
+    mk("text", { class: "i", x: n.x + 24, y: n.y + 31 }, g, n.ico || n.label.slice(0, 2).toUpperCase());
+    mk("text", { class: "n", x: n.x + 48, y: n.y + 24 }, g, n.label);
+    mk("text", { class: "s", x: n.x + 48, y: n.y + 40 }, g, n.sub || "");
+    g.addEventListener("click", (ev) => { ev.stopPropagation(); select(n.id); });
+    g.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); select(n.id); } });
+    g.addEventListener("mouseenter", () => focusOn(n.id)); g.addEventListener("mouseleave", () => focusOn(state.sel));
+    g.addEventListener("focus", () => focusOn(n.id)); g.addEventListener("blur", () => focusOn(state.sel));
+    return g;
+  });
+  svg.addEventListener("click", () => select(null));
+  draw.edgeEls = edgeEls; draw.nodeEls = nodeEls;
+  applyVisibility();
+}
+
+function visibleNode(n) { return (!n.layer || !state.hidden.has(n.layer)) && (!state.q || (n.label + " " + (n.sub || "") + " " + (n.desc || "")).toLowerCase().includes(state.q)); }
+function applyVisibility() {
+  DATA.nodes.forEach((n, i) => { const on = visibleNode(n) || (state.q && false); draw.nodeEls[i].style.display = (!n.layer || !state.hidden.has(n.layer)) ? "" : "none"; draw.nodeEls[i].style.opacity = on ? "" : ".25"; });
+  DATA.edges.forEach((e, i) => { const hide = (e.layer && state.hidden.has(e.layer)) || (byId[e.from].layer && state.hidden.has(byId[e.from].layer)) || (byId[e.to].layer && state.hidden.has(byId[e.to].layer)); draw.edgeEls[i].style.display = hide ? "none" : ""; });
+}
+function focusOn(id) {
+  const rel = new Set(id ? [id] : []);
+  DATA.edges.forEach((e, i) => { const hit = id && (e.from === id || e.to === id); const el = draw.edgeEls[i]; el.classList.toggle("hi", !!hit); el.querySelector("path").setAttribute("marker-end", hit ? "url(#arh)" : "url(#ar)"); if (hit) { rel.add(e.from); rel.add(e.to); } });
+  DATA.nodes.forEach((n, i) => draw.nodeEls[i].classList.toggle("rel", rel.has(n.id)));
+  svg.classList.toggle("focus", !!id);
+}
+function select(id) {
+  state.sel = id; stopFlow();
+  DATA.nodes.forEach((n, i) => draw.nodeEls[i].classList.toggle("sel", n.id === id));
+  focusOn(id); renderDetail();
+}
+function renderDetail() {
+  const box = $("#detail"), n = byId[state.sel];
+  if (!n) { box.replaceChildren(h("div", { class: "eyebrow" }, "Details"), h("h2", {}, DATA.title), h("p", { class: "muted" }, "Select a component to see what it does, its settings and what it talks to."),
+    h("div", { class: "tiles" }, h("div", { class: "tile" }, h("div", { class: "k" }, "Components"), h("div", { class: "v" }, DATA.nodes.length)), h("div", { class: "tile" }, h("div", { class: "k" }, "Connections"), h("div", { class: "v" }, DATA.edges.length)))); return; }
+  const out = DATA.edges.filter((e) => e.from === n.id), inc = DATA.edges.filter((e) => e.to === n.id);
+  const link = (otherId, e) => h("li", {}, h("button", { onclick: () => select(otherId) }, h("span", { class: "lbl" }, e.label || ""), byId[otherId].label));
+  box.replaceChildren(...[
+    h("div", { class: "eyebrow" }, (DATA.zones.find((z) => z.id === n.zone) || {}).label || "Component"),
+    h("h2", {}, n.label), n.sub ? h("div", { class: "mono muted", style: "font-size:12.5px" }, n.sub) : null,
+    h("p", {}, n.desc || ""),
+    n.facts && n.facts.length ? h("dl", {}, n.facts.flatMap(([k, v]) => [h("dt", {}, k), h("dd", {}, v)])) : null,
+    out.length ? h("div", {}, h("div", { class: "eyebrow" }, "Talks to"), h("ul", { class: "links" }, out.map((e) => link(e.to, e)))) : null,
+    inc.length ? h("div", { style: "margin-top:12px" }, h("div", { class: "eyebrow" }, "Called by"), h("ul", { class: "links" }, inc.map((e) => link(e.from, e)))) : null].filter(Boolean));
+}
+
+/* walk-through */
+function stopFlow() { clearInterval(state.timer); state.timer = null; $("#play").textContent = "▶ Play"; }
+function showStep() {
+  const f = DATA.flows[state.flow]; if (!f) return;
+  draw.edgeEls.forEach((el) => el.classList.remove("step"));
+  if (state.step < 0) { $("#stepcap").textContent = f.steps.length + " steps. Press Play or use ◀ ▶|."; return; }
+  const [ei, text] = f.steps[state.step];
+  draw.edgeEls[ei].classList.add("step");
+  $("#stepcap").textContent = `Step ${state.step + 1} of ${f.steps.length}: ${text}`;
+  const e = DATA.edges[ei]; state.sel = null; focusOn(null); svg.classList.add("focus");
+  DATA.nodes.forEach((n, i) => draw.nodeEls[i].classList.toggle("rel", n.id === e.from || n.id === e.to));
+}
+function stepBy(d) { const f = DATA.flows[state.flow]; if (!f) return; state.step = Math.min(f.steps.length - 1, Math.max(-1, state.step + d)); showStep(); }
+function play() {
+  if (state.timer) { stopFlow(); return; }
+  const f = DATA.flows[state.flow]; if (!f) return;
+  state.step = -1; $("#play").textContent = "❚❚ Pause";
+  const tick = () => { if (state.step >= f.steps.length - 1) { stopFlow(); return; } stepBy(1); };
+  tick(); state.timer = setInterval(tick, 1800);
+}
+
+/* table view */
+function drawTable() {
+  const t = $("#tbl"); t.replaceChildren(h("thead", {}, h("tr", {}, ["Component", "Where", "What it does", "Sends data to"].map((c) => h("th", {}, c)))),
+    h("tbody", {}, DATA.nodes.map((n) => h("tr", {}, h("td", {}, h("b", {}, n.label), n.sub ? h("div", { class: "mono muted", style: "font-size:12px" }, n.sub) : null),
+      h("td", {}, (DATA.zones.find((z) => z.id === n.zone) || {}).label || ""), h("td", {}, n.desc || ""),
+      h("td", {}, DATA.edges.filter((e) => e.from === n.id).map((e) => byId[e.to].label).join(", ") || "-")))));
+  $("#count").textContent = DATA.nodes.length + " components, " + DATA.edges.length + " connections";
+}
+
+/* tabs, layers, search, theme, height reporting */
+const REPO = "https://github.com/TabTQ/homelab-hub-and-docs";
+const VIEWS = [["overview", "Overview"], ["diagram", "Architecture"], ["hub", "Hub app"], ["docs", "Docs app"], ["security", "Security"], ["run", "Run it yourself"], ["reach", "Who can reach what"], ["table", "Components"]];
+function showView(id) { for (const [v] of VIEWS) $("#v-" + v).hidden = v !== id; document.querySelectorAll("#nav button").forEach((b) => b.setAttribute("aria-selected", b.dataset.v === id)); reportHeight(); }
+function setup() {
+  document.title = DATA.title; $("#brand").textContent = DATA.brand; $("#eyebrow").textContent = DATA.eyebrow; $("#title").textContent = DATA.title; $("#subtitle").textContent = DATA.subtitle;
+  $("#nav").replaceChildren(...VIEWS.map(([v, l]) => h("button", { role: "tab", "data-v": v, onclick: () => showView(v) }, l)));
+  $("#layers").replaceChildren(...DATA.layers.map((l) => h("button", { "aria-pressed": "true", onclick: (ev) => { const b = ev.currentTarget, on = b.getAttribute("aria-pressed") !== "true"; b.setAttribute("aria-pressed", on); on ? state.hidden.delete(l.id) : state.hidden.add(l.id); applyVisibility(); } }, l.label)));
+  if (!DATA.layers.length) $("#layers").remove();
+  $("#flowSel").replaceChildren(...DATA.flows.map((f, i) => h("option", { value: i }, f.name)));
+  if (!DATA.flows.length) ["#flowSel", "#prev", "#play", "#next", "label[for=flowSel]"].forEach((s) => $(s).remove());
+  $("#flowSel").onchange = (e) => { stopFlow(); state.flow = +e.target.value; state.step = -1; showStep(); };
+  $("#prev").onclick = () => { stopFlow(); stepBy(-1); }; $("#next").onclick = () => { stopFlow(); stepBy(1); }; $("#play").onclick = play;
+  $("#q").oninput = (e) => { state.q = e.target.value.trim().toLowerCase(); applyVisibility(); };
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { stopFlow(); state.step = -1; select(null); showStep(); } });
+  draw(); drawTable(); renderDetail(); showStep(); showView("overview");
+  if (REPO) { const a = $("#repoLink"); a.href = REPO; a.classList.add("on"); a.target = "_blank"; a.rel = "noopener noreferrer"; $("#repoText").textContent = REPO + "  (copy the address if your Docs page settings block pop-ups)";
+    const top = document.createElement("a"); top.className = "btn sm"; top.href = REPO; top.target = "_blank"; top.rel = "noopener noreferrer"; top.textContent = "GitHub"; $("#themeBtn").before(top); }
+}
+
+/* Theme + height protocol used when this page is shown inside Homelab Hub Docs (a sandboxed iframe). Works standalone too. */
+const root = document.documentElement; let themeMode = 0; // 0 system, 1 light, 2 dark
+function applyTheme(t) { t ? root.setAttribute("data-theme", t) : root.removeAttribute("data-theme"); $("#themeBtn").textContent = "Theme: " + (themeMode === 0 ? "system" : themeMode === 1 ? "light" : "dark"); }
+const fromUrl = new URLSearchParams(location.search).get("theme");
+if (fromUrl === "dark" || fromUrl === "light") { themeMode = fromUrl === "dark" ? 2 : 1; }
+addEventListener("message", (e) => { if (e.source === parent && e.data && e.data.type === "hub:theme") { themeMode = e.data.theme === "dark" ? 2 : 1; applyTheme(e.data.theme); } });
+$("#themeBtn").onclick = () => { themeMode = (themeMode + 1) % 3; applyTheme(themeMode === 0 ? null : themeMode === 1 ? "light" : "dark"); };
+function reportHeight() { try { parent.postMessage({ type: "hub:height", px: Math.ceil(Math.max(root.scrollHeight, document.body.scrollHeight)) }, "*"); } catch (_) {} }
+if (window.ResizeObserver) new ResizeObserver(reportHeight).observe(root);
+addEventListener("load", reportHeight);
+
+setup(); applyTheme(themeMode === 0 ? null : themeMode === 1 ? "light" : "dark");
+/* network filter for the reach table */
+(function () {
+  const bs = document.querySelectorAll("#netf button"), rows = document.querySelectorAll("#reachbody tr");
+  function apply(f) { let n = 0; rows.forEach((r) => { const on = f === "all" || r.dataset.net.split(" ").includes(f); r.hidden = !on; if (on) n++; }); $("#netcount").textContent = n + " of " + rows.length + " paths"; bs.forEach((b) => b.setAttribute("aria-pressed", b.dataset.f === f)); reportHeight(); }
+  bs.forEach((b) => (b.onclick = () => apply(b.dataset.f))); apply("all");
+})();
+</script>
+</body>
+</html>
