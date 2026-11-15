@@ -1,0 +1,64 @@
+server:
+  port: ${DOCS_PORT:3020}
+  servlet:
+    session:
+      timeout: 12h
+      cookie:
+        name: DOCSSESSION
+        http-only: true
+        same-site: strict
+        secure: ${app.security.secure-cookies:false}
+  error:
+    include-stacktrace: never
+    include-message: never
+  tomcat:
+    # Uploads are capped by the app (DOCS_MAX_ASSET_MB / DOCS_MAX_BUNDLE_MB); this only stops absurd bodies early.
+    max-swallow-size: 64MB
+
+spring:
+  main:
+    banner-mode: off
+  datasource:
+    url: jdbc:sqlite:${DOCS_DATA_DIR:./data}/docs.db?foreign_keys=on&journal_mode=WAL&busy_timeout=5000&synchronous=NORMAL
+    hikari:
+      maximum-pool-size: 4
+  flyway:
+    enabled: true
+  servlet:
+    multipart:
+      max-file-size: 64MB
+      max-request-size: 64MB
+      file-size-threshold: 1MB
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+# The login settings keep their own prefix; the values come from DOCS_* variables.
+app:
+  auth:
+    mode: ${DOCS_AUTH_MODE:all}
+    password-hash: ${DOCS_PASSWORD_HASH:}
+  security:
+    allowed-hosts: ${DOCS_ALLOWED_HOSTS:}
+    allowed-hosts-variable: DOCS_ALLOWED_HOSTS
+    secure-cookies: ${DOCS_SECURE_COOKIES:false}
+
+docs:
+  data-dir: ${DOCS_DATA_DIR:./data}
+  max-asset-mb: ${DOCS_MAX_ASSET_MB:20}
+  max-bundle-mb: ${DOCS_MAX_BUNDLE_MB:25}
+  # GitHub Pages publishing. Off by default.
+  github:
+    enabled: ${DOCS_GH_ENABLED:false}
+    repo: ${DOCS_GH_REPO:}
+    branch: ${DOCS_GH_BRANCH:gh-pages}
+    token: ${DOCS_GH_TOKEN:}
+    site-url: ${DOCS_GH_SITE_URL:}
+    dry-run: ${DOCS_GH_DRY_RUN:false}
+    api-url: ${DOCS_GH_API_URL:https://api.github.com}
+  backup:
+    keep: 14
+    cron: "0 40 3 * * *"

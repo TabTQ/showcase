@@ -1,0 +1,44 @@
+# Showcase Docs. From this folder:   cp .env.example .env   (edit it)   then   docker compose up -d --build
+#
+# One service. The editor listens on port 3020 and has no TLS of its own: keep the port private (see the README, "Security").
+services:
+  showcase-docs:
+    build: { context: ., dockerfile: Dockerfile }
+    image: showcase-docs:local
+    container_name: showcase-docs
+    restart: unless-stopped
+    ports:
+      - "${DOCS_BIND:-127.0.0.1}:${DOCS_PORT:-3020}:3020"
+    environment:
+      DOCS_PORT: 3020
+      DOCS_PASSWORD_HASH: "${DOCS_PASSWORD_HASH:-}"
+      DOCS_AUTH_MODE: ${DOCS_AUTH_MODE:-all}
+      DOCS_ALLOWED_HOSTS: ${DOCS_ALLOWED_HOSTS:-}
+      DOCS_SECURE_COOKIES: ${DOCS_SECURE_COOKIES:-false}
+      DOCS_MAX_ASSET_MB: ${DOCS_MAX_ASSET_MB:-20}
+      DOCS_MAX_BUNDLE_MB: ${DOCS_MAX_BUNDLE_MB:-25}
+      # GitHub Pages publishing needs only outbound HTTPS to api.github.com. The token stays in .env.
+      DOCS_GH_ENABLED: ${DOCS_GH_ENABLED:-false}
+      DOCS_GH_REPO: ${DOCS_GH_REPO:-}
+      DOCS_GH_BRANCH: ${DOCS_GH_BRANCH:-gh-pages}
+      DOCS_GH_TOKEN: ${DOCS_GH_TOKEN:-}
+      DOCS_GH_SITE_URL: ${DOCS_GH_SITE_URL:-}
+      DOCS_GH_DRY_RUN: ${DOCS_GH_DRY_RUN:-false}
+      DOCS_GH_API_URL: ${DOCS_GH_API_URL:-https://api.github.com}
+      JAVA_TOOL_OPTIONS: ${DOCS_JAVA_OPTS:--Xmx256m -XX:+UseSerialGC -Xss512k}
+    volumes:
+      - docs-data:/data   # docs.db, blobs/, backups/ and the dry-run site. Back this volume up.
+    read_only: true
+    # exec is needed: sqlite-jdbc unpacks its native library into /tmp and loads it from there
+    tmpfs: ["/tmp:rw,exec,nosuid,size=96m"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:3020/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  docs-data: {}

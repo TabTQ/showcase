@@ -1,0 +1,10 @@
+**/node_modules
+**/target
+**/dist
+.git
+.scratch
+data
+.env
+**/*.db
+src/main/resources/static
+src/main/resources/static-export
